@@ -117,83 +117,166 @@ body::before {
   transform: translate(-50%, -50%);
 }
 
-.flower:nth-child(4) { left: 8%; bottom: 75px; background: var(--tama-pink); animation-delay: 0s; }
-.flower:nth-child(5) { left: 23%; bottom: 95px; background: var(--tama-purple); animation-delay: 1s; }
-.flower:nth-child(6) { left: 38%; bottom: 85px; background: var(--tama-orange); animation-delay: 2s; }
-.flower:nth-child(7) { left: 52%; bottom: 110px; background: var(--tama-green); animation-delay: 0.3s; }
-.flower:nth-child(8) { left: 67%; bottom: 90px; background: var(--tama-blue); animation-delay: 0.5s; }
-.flower:nth-child(9) { left: 82%; bottom: 100px; background: var(--tama-green); animation-delay: 1.5s; }
-.flower:nth-child(10) { left: 14%; bottom: 105px; background: var(--tama-purple); animation-delay: 2.2s; }
-.flower:nth-child(11) { left: 58%; bottom: 80px; background: var(--tama-pink); animation-delay: 1.8s; }
+.flower:nth-child(4) { left: 8%; bottom: 40px; background: var(--tama-pink); animation-delay: 0s; }
+.flower:nth-child(5) { left: 23%; bottom: 160px; background: var(--tama-purple); animation-delay: 1s; }
+.flower:nth-child(6) { left: 38%; bottom: 65px; background: var(--tama-orange); animation-delay: 2s; }
+.flower:nth-child(7) { left: 52%; bottom: 140px; background: var(--tama-green); animation-delay: 0.3s; }
+.flower:nth-child(8) { left: 67%; bottom: 45px; background: var(--tama-blue); animation-delay: 0.5s; }
+.flower:nth-child(9) { left: 82%; bottom: 130px; background: var(--tama-green); animation-delay: 1.5s; }
+.flower:nth-child(10) { left: 14%; bottom: 170px; background: var(--tama-purple); animation-delay: 2.2s; }
+.flower:nth-child(11) { left: 58%; bottom: 50px; background: var(--tama-pink); animation-delay: 1.8s; }
 
 @keyframes sway {
   0%, 100% { transform: rotate(-5deg); }
   50% { transform: rotate(5deg); }
 }
 
-/* Cute dogs using public cartoon illustrations */
+/* Cute dogs using simple CSS shapes */
 .dog {
   position: fixed;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 28px;
   z-index: -1;
   transform-origin: center bottom;
-  background-image: url('https://openclipart.org/download/328657/brown-cartoon-dog.svg');
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center bottom;
+}
+
+/* Dog body (oval) */
+.dog::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  width: 20px;
+  height: 14px;
+  background: #8B4513;
+  border-radius: 50%;
+  box-shadow: 
+    /* Legs */
+    -4px 10px 0 -6px #8B4513,
+    -1px 10px 0 -6px #8B4513,
+    6px 10px 0 -6px #8B4513,
+    9px 10px 0 -6px #8B4513,
+    /* Body outline */
+    0 0 0 1px var(--tama-dark);
+}
+
+/* Dog head and features */
+.dog::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  left: 20px;
+  width: 14px;
+  height: 12px;
+  background: #8B4513;
+  border-radius: 60% 60% 40% 40%;
+  box-shadow: 
+    /* Head outline */
+    0 0 0 1px var(--tama-dark),
+    /* Ears */
+    -8px -4px 0 -2px #654321,
+    -4px -6px 0 -2px #654321,
+    /* Eyes */
+    -8px 2px 0 -6px black,
+    -4px 2px 0 -6px black,
+    /* Nose */
+    -6px 6px 0 -7px black,
+    /* Tail */
+    -16px -2px 0 -2px #8B4513;
 }
 
 .dog1 {
   animation: frolic1 20s ease-in-out infinite;
-  filter: hue-rotate(0deg) brightness(1.1) saturate(1.2);
+}
+
+.dog1::before {
+  background: #D2691E;
+  box-shadow: 
+    -4px 10px 0 -6px #D2691E,
+    -1px 10px 0 -6px #D2691E,
+    6px 10px 0 -6px #D2691E,
+    9px 10px 0 -6px #D2691E,
+    0 0 0 1px var(--tama-dark);
+}
+
+.dog1::after {
+  background: #D2691E;
+  box-shadow: 
+    0 0 0 1px var(--tama-dark),
+    -8px -4px 0 -2px #B8860B,
+    -4px -6px 0 -2px #B8860B,
+    -8px 2px 0 -6px black,
+    -4px 2px 0 -6px black,
+    -6px 6px 0 -7px black,
+    -16px -2px 0 -2px #D2691E;
 }
 
 .dog2 {
   animation: frolic2 25s ease-in-out infinite;
   animation-delay: -10s;
-  filter: hue-rotate(60deg) brightness(1.15) saturate(1.3);
+}
+
+.dog2::before {
+  background: #696969;
+  box-shadow: 
+    -4px 10px 0 -6px #696969,
+    -1px 10px 0 -6px #696969,
+    6px 10px 0 -6px #696969,
+    9px 10px 0 -6px #696969,
+    0 0 0 1px var(--tama-dark);
+}
+
+.dog2::after {
+  background: #696969;
+  box-shadow: 
+    0 0 0 1px var(--tama-dark),
+    -8px -4px 0 -2px #2F4F4F,
+    -4px -6px 0 -2px #2F4F4F,
+    -8px 2px 0 -6px black,
+    -4px 2px 0 -6px black,
+    -6px 6px 0 -7px black,
+    -16px -2px 0 -2px #696969;
 }
 
 @keyframes frolic1 {
   0% { 
     left: 10%; 
-    bottom: 90px; 
+    bottom: 60px; 
     transform: scale(1) rotate(0deg); 
   }
   15% { 
     left: 30%; 
-    bottom: 110px; 
+    bottom: 150px; 
     transform: scale(1.1) rotate(5deg); 
   }
   30% { 
     left: 60%; 
-    bottom: 85px; 
+    bottom: 40px; 
     transform: scale(0.9) rotate(-3deg); 
   }
   45% { 
     left: 80%; 
-    bottom: 105px; 
+    bottom: 170px; 
     transform: scale(1.2) rotate(8deg); 
   }
   60% { 
     left: 70%; 
-    bottom: 95px; 
-    transform: scale(1) rotate(-2deg); 
+    bottom: 120px; 
+    transform: scale(1) rotate(-2deg) scaleX(-1); 
   }
   75% { 
     left: 40%; 
-    bottom: 115px; 
-    transform: scale(1.1) rotate(6deg); 
+    bottom: 180px; 
+    transform: scale(1.1) rotate(6deg) scaleX(-1); 
   }
   90% { 
     left: 20%; 
-    bottom: 100px; 
-    transform: scale(0.95) rotate(-4deg); 
+    bottom: 80px; 
+    transform: scale(0.95) rotate(-4deg) scaleX(-1); 
   }
   100% { 
     left: 10%; 
-    bottom: 90px; 
+    bottom: 60px; 
     transform: scale(1) rotate(0deg); 
   }
 }
@@ -201,42 +284,42 @@ body::before {
 @keyframes frolic2 {
   0% { 
     left: 75%; 
-    bottom: 95px; 
+    bottom: 130px; 
     transform: scale(1) rotate(0deg); 
   }
   20% { 
     left: 50%; 
-    bottom: 120px; 
-    transform: scale(1.15) rotate(-6deg); 
+    bottom: 180px; 
+    transform: scale(1.15) rotate(-6deg) scaleX(-1); 
   }
   35% { 
     left: 25%; 
-    bottom: 80px; 
-    transform: scale(0.85) rotate(4deg); 
+    bottom: 50px; 
+    transform: scale(0.85) rotate(4deg) scaleX(-1); 
   }
   50% { 
     left: 15%; 
-    bottom: 110px; 
-    transform: scale(1.1) rotate(-8deg); 
+    bottom: 160px; 
+    transform: scale(1.1) rotate(-8deg) scaleX(-1); 
   }
   65% { 
     left: 45%; 
-    bottom: 88px; 
+    bottom: 35px; 
     transform: scale(0.9) rotate(3deg); 
   }
   80% { 
     left: 70%; 
-    bottom: 108px; 
+    bottom: 145px; 
     transform: scale(1.2) rotate(-5deg); 
   }
   95% { 
     left: 85%; 
-    bottom: 98px; 
+    bottom: 70px; 
     transform: scale(1.05) rotate(2deg); 
   }
   100% { 
     left: 75%; 
-    bottom: 95px; 
+    bottom: 130px; 
     transform: scale(1) rotate(0deg); 
   }
 }

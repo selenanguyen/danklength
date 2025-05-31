@@ -108,31 +108,39 @@ export const useGameState = () => {
     });
   }, []);
 
-  // Shared function to calculate the adjusted target center (same logic as Dial component)
-  const getAdjustedTargetCenter = useCallback((targetPos: number, targetWidth: number) => {
+  // Shared function to calculate the adjusted target center (EXACT same logic as Dial component)
+  const getAdjustedTargetCenter = useCallback((targetPos: number, _targetWidth: number) => {
     let center = targetPos;
-    const halfWidth = (targetWidth * 0.9) / 2; // Match the display scaling
+    const halfWidth = 25 / 2; // GAME LOGIC: Fixed 25% - independent of visual rendering size
     
     // Calculate the full target range
     const leftEdge = center - halfWidth;
     const rightEdge = center + halfWidth;
     
     // If only a small portion would wrap, adjust the center to avoid wrapping
-    const wrapThreshold = halfWidth * 0.15; // 15% of target width
+    const wrapThreshold = halfWidth * 0.15; // 15% of target width (match Dial exactly)
     
     if (leftEdge < 0 && Math.abs(leftEdge) < wrapThreshold) {
       // Small overhang on left - shift right to keep everything visible
       center = halfWidth;
+      console.log('SCORE CALC: Target adjusted left to right:', targetPos, '→', center);
     } else if (rightEdge > 100 && (rightEdge - 100) < wrapThreshold) {
       // Small overhang on right - shift left to keep everything visible  
       center = 100 - halfWidth;
+      console.log('SCORE CALC: Target adjusted right to left:', targetPos, '→', center);
+    } else {
+      console.log('SCORE CALC: Target not adjusted:', targetPos);
     }
     
     return center;
   }, []);
 
   const calculateScore = useCallback((dialPos: number, targetPos: number, targetWidth: number): ScoreResult => {
-    // Use the same adjusted center position as the visual display
+    console.log('=== SCORE CALCULATION TARGET ===');
+    console.log('Original target position:', targetPos, 'Target width:', targetWidth);
+    
+    // IMPORTANT: This uses GAME LOGIC target size (25%), NOT visual display size
+    // The visual target in Dial component can be different for better UX
     const adjustedCenter = getAdjustedTargetCenter(targetPos, targetWidth);
     
     // Calculate distance considering wrapping around the spectrum
@@ -140,10 +148,10 @@ export const useGameState = () => {
     const wrapAroundDistance = 100 - straightDistance; // Distance going the other way around
     const distance = Math.min(straightDistance, wrapAroundDistance);
     
-    const halfWidth = (targetWidth * 0.9) / 2; // Match the display scaling
-    const centerWidth = halfWidth / 3;        // Blue center: 1/3 of half
-    const innerWidth = halfWidth / 3.5;       // Purple zones: slightly smaller  
-    const outerWidth = halfWidth / 4;         // Red zones: larger than before
+    const halfWidth = 25 / 2; // GAME LOGIC: Fixed 25% - independent of visual rendering size
+    const centerWidth = halfWidth / 4.5;      // Blue center: slightly larger (4 points)
+    const innerWidth = halfWidth / 4.8;       // Purple zones: slightly larger (3 points)
+    const outerWidth = halfWidth / 5.5;       // Red zones: smaller (2 points)
     
     // Zone boundaries from center outward (total radius from center)
     const centerZone = centerWidth / 2;                    // Half of center width
@@ -161,7 +169,8 @@ export const useGameState = () => {
       innerZone,
       outerZone,
       halfWidth,
-      targetWidth
+      targetWidth,
+      wasAdjusted: adjustedCenter !== targetPos
     });
     
     if (distance <= centerZone) {
@@ -176,34 +185,43 @@ export const useGameState = () => {
   }, [getAdjustedTargetCenter]);
 
   const submitGuess = useCallback((position: number) => {
-    setGameState(prev => ({
-      ...prev,
-      dialPosition: position,
-      gamePhase: 'scoring',
-    }));
-  }, []);
-
-  const finishRound = useCallback(() => {
+    console.log('submitGuess function called with position:', position);
     setGameState(prev => {
-      const { dialPosition, targetPosition, targetWidth, totalScore, roundScores, currentRound, totalRounds } = prev;
+      const { targetPosition, targetWidth, totalScore, roundScores, currentRound, totalRounds } = prev;
       
-      console.log('finishRound called:', { dialPosition, targetPosition, targetWidth });
-      const result = calculateScore(dialPosition, targetPosition, targetWidth);
+      console.log('submitGuess state update:', { 
+        position, 
+        targetPosition, 
+        targetWidth, 
+        currentRound, 
+        totalRounds, 
+        currentPhase: prev.gamePhase 
+      });
+      
+      const result = calculateScore(position, targetPosition, targetWidth);
       console.log('Score result:', result);
       
       const newTotalScore = totalScore + result.points;
       const newRoundScores = [...roundScores, result.points];
       
-      if (currentRound >= totalRounds) {
+      // Check if game should end
+      const shouldEnd = currentRound >= totalRounds;
+      console.log('Should game end?', shouldEnd, `(${currentRound} >= ${totalRounds})`);
+      
+      if (shouldEnd) {
+        console.log('Transitioning to ended phase');
         return {
           ...prev,
+          dialPosition: position,
           totalScore: newTotalScore,
           roundScores: newRoundScores,
           gamePhase: 'ended',
         };
       } else {
+        console.log('Transitioning to scoring phase');
         return {
           ...prev,
+          dialPosition: position,
           totalScore: newTotalScore,
           roundScores: newRoundScores,
           gamePhase: 'scoring',
@@ -211,6 +229,13 @@ export const useGameState = () => {
       }
     });
   }, [calculateScore]);
+
+  const finishRound = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      gamePhase: 'ended',
+    }));
+  }, []);
 
   const initializeAndStartGame = useCallback((config: GameConfig, syncedGameState?: Partial<GameState>) => {
     const players: Player[] = config.players.map((name, index) => ({

@@ -384,7 +384,7 @@ io.on('connection', (socket) => {
       dialPosition: 50, // Initial dial position at center
       gamePhase: 'psychic',
       psychicClue: '',
-      currentRound: 0,
+      currentRound: 1,
       totalRounds: 8, // Default 8 rounds
       totalScore: 0,
       roundScores: [],

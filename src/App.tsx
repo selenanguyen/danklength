@@ -17,7 +17,6 @@ function App() {
     startNewRound,
     submitClue,
     submitGuess,
-    finishRound,
     resetGame,
     updateDialPosition,
     calculateScore,
@@ -25,7 +24,7 @@ function App() {
   } = useGameState();
 
   const socketInstance = useSocket();
-  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession } = socketInstance;
+  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction } = socketInstance;
 
   const [clueInput, setClueInput] = useState('');
   const [playMode, setPlayMode] = useState<'local' | 'remote' | null>(null);
@@ -56,18 +55,14 @@ function App() {
     }
   }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, gameState.psychicClue, updateGameState]);
 
-  // Listen for dial updates from other players (host only)
+  // Listen for dial updates from all players for real-time synchronization
   useEffect(() => {
-    if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase === 'guessing') {
+    if (playMode === 'remote') {
       const handleDialUpdate = (...args: unknown[]) => {
         const data = args[0] as { position: number; playerId: string };
-        console.log('Host received dial update during guessing:', data);
-        // Update local dial position and then process the guess
+        console.log('Received dial update:', data);
+        // Update dial position for all players in real-time
         updateDialPosition(data.position);
-        setTimeout(() => {
-          submitGuess(data.position);
-          finishRound();
-        }, 100); // Small delay to ensure dial position is updated
       };
 
       const { addEventListener, removeEventListener } = socketInstance;
@@ -77,7 +72,35 @@ function App() {
         removeEventListener('dial-updated', handleDialUpdate);
       };
     }
-  }, [playMode, multiplayerState.isHost, gameState.gamePhase, socketInstance, submitGuess, finishRound, updateDialPosition]);
+  }, [playMode, socketInstance, updateDialPosition]);
+
+  // Listen for player actions (like lock-in-guess) - host only
+  useEffect(() => {
+    if (playMode === 'remote' && multiplayerState.isHost) {
+      const handlePlayerAction = (...args: unknown[]) => {
+        const eventData = args[0] as { playerId: string; action: string; data: { position?: number; clue?: string } };
+        console.log('=== HOST RECEIVED PLAYER ACTION ===');
+        console.log('Player action data:', eventData);
+        
+        if (eventData.action === 'lock-in-guess' && eventData.data.position !== undefined) {
+          console.log('HOST: Processing lock-in-guess from player:', eventData.playerId, 'at position:', eventData.data.position);
+          submitGuess(eventData.data.position);
+        } else if (eventData.action === 'submit-clue' && eventData.data.clue !== undefined) {
+          console.log('HOST: Processing submit-clue from player:', eventData.playerId, 'clue:', eventData.data.clue);
+          submitClue(eventData.data.clue);
+        } else {
+          console.log('HOST: Unhandled action or missing data:', eventData.action, eventData.data);
+        }
+      };
+
+      const { addEventListener, removeEventListener } = socketInstance;
+      addEventListener('player-action', handlePlayerAction);
+      
+      return () => {
+        removeEventListener('player-action', handlePlayerAction);
+      };
+    }
+  }, [playMode, multiplayerState.isHost, socketInstance, submitGuess]);
 
   const handleGameSetup = () => {
     setPlayMode('local');
@@ -106,36 +129,56 @@ function App() {
 
   const handleSubmitClue = () => {
     if (clueInput.trim()) {
-      console.log('Submitting clue:', clueInput, 'Current phase:', gameState.gamePhase);
-      submitClue(clueInput);
+      console.log('=== HANDLE SUBMIT CLUE CALLED ===');
+      console.log('Clue:', clueInput, 'Current phase:', gameState.gamePhase);
+      console.log('Is host:', multiplayerState.isHost, 'Play mode:', playMode);
+      
+      if (playMode === 'remote') {
+        if (multiplayerState.isHost) {
+          // Host submits clue directly
+          console.log('Host submitting clue:', clueInput);
+          submitClue(clueInput);
+        } else {
+          // Non-host: send clue to host for processing
+          console.log('Non-host sending clue to host:', clueInput);
+          sendPlayerAction('submit-clue', { clue: clueInput });
+        }
+      } else {
+        // Local mode: submit directly
+        console.log('Local mode: submitting clue:', clueInput);
+        submitClue(clueInput);
+      }
+      
       setClueInput('');
-      console.log('Clue submitted, local state should update to guessing phase');
-      // Note: In multiplayer mode, state sync happens automatically via useEffect
-      // after submitClue updates the local state
     }
   };
 
   const handleSubmitGuess = () => {
-    console.log('handleSubmitGuess called with dial position:', gameState.dialPosition);
+    console.log('=== HANDLE SUBMIT GUESS CALLED ===');
+    console.log('Current game state:', {
+      phase: gameState.gamePhase,
+      round: gameState.currentRound,
+      totalRounds: gameState.totalRounds,
+      dialPosition: gameState.dialPosition,
+      playMode,
+      isHost: multiplayerState.isHost
+    });
     
     if (playMode === 'remote') {
       if (multiplayerState.isHost) {
         // Host handles guess submission and scoring
         console.log('Host submitting guess at position:', gameState.dialPosition);
         submitGuess(gameState.dialPosition);
-        finishRound();
       } else {
-        // Non-host: send dial position to host, then host will process
-        console.log('Non-host sending dial position to host:', gameState.dialPosition);
-        const { updateDialPosition } = socketInstance;
-        updateDialPosition(gameState.dialPosition);
-        // Send a signal to host to process the guess
-        // For now, we'll have host auto-process when they receive dial update during guessing phase
+        // Non-host: emit a "lock-in-guess" event to the host
+        console.log('Non-host locking in guess at position:', gameState.dialPosition);
+        console.log('Sending lock-in-guess action to host...');
+        sendPlayerAction('lock-in-guess', { position: gameState.dialPosition });
       }
     } else {
       // In local mode, submit guess and calculate score immediately
+      console.log('Local mode: submitting guess at position:', gameState.dialPosition);
       submitGuess(gameState.dialPosition);
-      finishRound();
     }
   };
 
@@ -152,7 +195,9 @@ function App() {
   };
 
   const handleFinishGame = () => {
-    finishRound();
+    // This should not be needed anymore since submitGuess automatically 
+    // transitions to 'ended' when currentRound >= totalRounds
+    console.log('handleFinishGame called - this should not happen');
   };
 
   // Welcome screen
@@ -251,6 +296,27 @@ function App() {
     (playMode === 'remote' && currentMultiplayerPlayer && currentPlayer && 
      gameState.players.findIndex(p => p.name === currentMultiplayerPlayer.name) === gameState.currentPsychicIndex);
 
+  // Debug logging for psychic role detection
+  console.log('=== PSYCHIC ROLE DEBUG ===');
+  console.log('Game state:', {
+    phase: gameState.gamePhase,
+    round: gameState.currentRound,
+    psychicIndex: gameState.currentPsychicIndex,
+    currentPlayer: currentPlayer?.name,
+    players: gameState.players.map(p => p.name)
+  });
+  console.log('Multiplayer state:', {
+    currentPlayerId: multiplayerState.currentPlayerId,
+    currentPlayerName: currentMultiplayerPlayer?.name,
+    isHost: multiplayerState.isHost
+  });
+  console.log('Role calculation:', {
+    isCurrentPlayerPsychic,
+    playMode,
+    playerIndexInGame: currentMultiplayerPlayer && currentPlayer ? 
+      gameState.players.findIndex(p => p.name === currentMultiplayerPlayer.name) : -1
+  });
+
   // Show target zones: for psychic during psychic phase, or for everyone during scoring
   const showTarget = (gameState.gamePhase === 'psychic' && isCurrentPlayerPsychic) || 
                     gameState.gamePhase === 'scoring';
@@ -301,7 +367,15 @@ function App() {
         targetPosition={gameState.targetPosition}
         targetWidth={gameState.targetWidth}
         showTarget={showTarget}
-        onPositionChange={updateDialPosition}
+        onPositionChange={(position) => {
+          // Update local position
+          updateDialPosition(position);
+          // Send to other players in multiplayer mode
+          if (playMode === 'remote') {
+            const { updateDialPosition: sendDialUpdate } = socketInstance;
+            sendDialUpdate(position);
+          }
+        }}
         disabled={gameState.gamePhase === 'scoring' || (gameState.gamePhase === 'guessing' && isCurrentPlayerPsychic)}
         hidePointer={false}
         hideForNonPsychic={gameState.gamePhase === 'psychic' && !isCurrentPlayerPsychic}
@@ -348,10 +422,12 @@ function App() {
             <h3>🎯 Team Guessing</h3>
             <p><strong>Clue:</strong> "{gameState.psychicClue}"</p>
             {isCurrentPlayerPsychic ? (
-              <p>Watch your team work together to guess the target position!</p>
+              <p>Watch your team work together to guess the target position! You can see live updates as they move the dial.</p>
             ) : (
               <>
-                <p>Work together to position the dial where you think the target is!</p>
+                <p>Work together to position the dial where you think the target is! 
+                   {playMode === 'remote' && ' All players can move the dial simultaneously - work together!'}
+                </p>
                 <button className="action-button" onClick={handleSubmitGuess}>
                   Lock In Guess
                 </button>

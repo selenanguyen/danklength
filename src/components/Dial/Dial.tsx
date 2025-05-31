@@ -17,7 +17,7 @@ interface DialProps {
 export const Dial: React.FC<DialProps> = ({
   position,
   targetPosition,
-  targetWidth = 20,
+  targetWidth: _targetWidth = 20, // Renamed to indicate it's intentionally unused
   showTarget = false,
   onPositionChange,
   disabled = false,
@@ -52,8 +52,8 @@ export const Dial: React.FC<DialProps> = ({
       angleDegrees = angleDegrees > 270 ? 0 : 180;
     }
     
-    // Convert angle to percentage (0% = leftmost, 100% = rightmost)
-    const percentage = Math.max(0, Math.min(100, (angleDegrees / 180) * 100));
+    // Convert angle to percentage (flip so 0° = rightmost, 180° = leftmost)
+    const percentage = Math.max(0, Math.min(100, 100 - (angleDegrees / 180) * 100));
     const newPosition = Math.round(percentage);
     
     console.log('Dial click:', {
@@ -70,6 +70,7 @@ export const Dial: React.FC<DialProps> = ({
   }, [onPositionChange, disabled]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    console.log('handleMouseDown called, disabled:', disabled);
     if (disabled) return;
     e.preventDefault();
     setIsDragging(true);
@@ -122,14 +123,17 @@ export const Dial: React.FC<DialProps> = ({
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   // Convert position (0-100) to rotation angle (-90 to 90 degrees)
-  // Flip the rotation to match click direction
-  const getRotation = (pos: number) => 90 - (pos / 100) * 180;
+  // Match the flipped position calculation
+  const getRotation = (pos: number) => -90 + (pos / 100) * 180;
   
   const getTargetStyle = () => {
     if (!showTarget || targetPosition === undefined) return {};
     
+    console.log('=== DIAL TARGET RENDERING ===');
+    console.log('Target position:', targetPosition, 'Show target:', showTarget);
+    
     let center = targetPosition;
-    const halfWidth = (targetWidth * 0.9) / 2; // Target area takes up ~20-22% of semicircle
+    const halfWidth = 35 / 2; // VISUAL ONLY: Display size (can be adjusted for better UX without affecting scoring)
     
     // Calculate the full target range
     const leftEdge = center - halfWidth;
@@ -141,22 +145,24 @@ export const Dial: React.FC<DialProps> = ({
     if (leftEdge < 0 && Math.abs(leftEdge) < wrapThreshold) {
       // Small overhang on left - shift right to keep everything visible
       center = halfWidth;
+      console.log('Target adjusted left to right:', targetPosition, '→', center);
     } else if (rightEdge > 100 && (rightEdge - 100) < wrapThreshold) {
       // Small overhang on right - shift left to keep everything visible  
       center = 100 - halfWidth;
+      console.log('Target adjusted right to left:', targetPosition, '→', center);
     }
     
-    // Create 5 zones with more balanced proportions
-    const centerWidth = halfWidth / 3;        // Blue center: 1/3 of half
-    const innerWidth = halfWidth / 3.5;       // Purple zones: slightly smaller  
-    const outerWidth = halfWidth / 4;         // Red zones: larger than before
+    // Create 5 zones with slightly forgiving proportions for higher-value zones (match scoring exactly)
+    const centerWidth = halfWidth / 4.5;      // Blue center: slightly larger (4 points)
+    const innerWidth = halfWidth / 4.8;       // Purple zones: slightly larger (3 points)
+    const outerWidth = halfWidth / 5.5;       // Red zones: smaller (2 points)
     
     // Calculate zone boundaries (allow negative and >100 values)
     const leftOuterStart = center - centerWidth/2 - innerWidth - outerWidth;
     const leftOuterEnd = center - centerWidth/2 - innerWidth;
     const leftInnerStart = leftOuterEnd;
     const leftInnerEnd = center - centerWidth/2;
-    const centerStart = leftInnerEnd;
+    const centerStart = center - centerWidth/2;
     const centerEnd = center + centerWidth/2;
     const rightInnerStart = centerEnd;
     const rightInnerEnd = center + centerWidth/2 + innerWidth;
