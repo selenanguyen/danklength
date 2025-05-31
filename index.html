@@ -30,5 +30,78 @@
     
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Poop cleaning functionality and random positioning -->
+    <script>
+      // Add click handlers for poop cleaning when DOM loads
+      document.addEventListener('DOMContentLoaded', function() {
+        // Randomize poop locations on page load
+        function randomizePoopLocations() {
+          // Generate random positions between 20% and 80% to keep them visible
+          const poop1Left = Math.floor(Math.random() * 40 + 20) + '%'; // 20-60%
+          const poop2Left = Math.floor(Math.random() * 40 + 40) + '%'; // 40-80%
+          
+          // Set CSS custom properties for poop positions
+          document.documentElement.style.setProperty('--poop1-left', poop1Left);
+          document.documentElement.style.setProperty('--poop2-left', poop2Left);
+          
+          console.log('Randomized poop locations:', poop1Left, poop2Left);
+        }
+        
+        function addPoopCleaners() {
+          const poops = document.querySelectorAll('.poop');
+          poops.forEach(poop => {
+            // Remove existing listeners to avoid duplicates
+            poop.removeEventListener('click', handlePoopClick);
+            poop.addEventListener('click', handlePoopClick);
+          });
+        }
+        
+        function handlePoopClick(event) {
+          const poop = event.target;
+          if (poop.classList.contains('cleaning')) return; // Already being cleaned
+          
+          // Start cleaning animation
+          poop.classList.add('cleaning');
+          
+          // Create broom element
+          const broom = document.createElement('div');
+          broom.className = 'broom';
+          
+          // Get the actual computed position of the poop
+          const poopRect = poop.getBoundingClientRect();
+          const bodyRect = document.body.getBoundingClientRect();
+          const poopLeftPercent = ((poopRect.left - bodyRect.left) / bodyRect.width * 100) + '%';
+          
+          broom.style.left = poopLeftPercent;
+          document.body.appendChild(broom);
+          
+          // Remove both elements after animation
+          setTimeout(() => {
+            if (broom.parentNode) {
+              broom.parentNode.removeChild(broom);
+            }
+            if (poop.parentNode) {
+              poop.classList.remove('cleaning');
+              // Reset poop animation to start fresh cycle
+              poop.style.animation = 'none';
+              setTimeout(() => {
+                poop.style.animation = '';
+              }, 10);
+            }
+          }, 2000);
+        }
+        
+        // Initialize random locations and poop cleaners
+        randomizePoopLocations();
+        addPoopCleaners();
+        
+        // Re-add event listeners periodically in case DOM updates
+        setInterval(addPoopCleaners, 5000);
+        
+        // Randomize locations every few minutes to keep it fresh
+        setInterval(randomizePoopLocations, 120000); // Every 2 minutes
+      });
+    </script>
   </body>
 </html>

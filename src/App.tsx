@@ -231,7 +231,7 @@ function App() {
   if (gameState.gamePhase === 'player-setup' && playMode === 'local') {
     return (
       <div className="game-container compact">
-        <PlayerSetup onStartGame={handlePlayerSetup} />
+        <PlayerSetup onStartGame={handlePlayerSetup} onBackToMain={handleBackToWelcome} />
       </div>
     );
   }

@@ -131,84 +131,21 @@ body::before {
   50% { transform: rotate(5deg); }
 }
 
-/* Cute dogs using simple CSS shapes */
+/* Cute dogs using animated GIF */
 .dog {
   position: fixed;
-  width: 36px;
-  height: 28px;
+  width: 60px;
+  height: 60px;
   z-index: -1;
   transform-origin: center bottom;
-}
-
-/* Dog body (oval) */
-.dog::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 8px;
-  width: 20px;
-  height: 14px;
-  background: #8B4513;
-  border-radius: 50%;
-  box-shadow: 
-    /* Legs */
-    -4px 10px 0 -6px #8B4513,
-    -1px 10px 0 -6px #8B4513,
-    6px 10px 0 -6px #8B4513,
-    9px 10px 0 -6px #8B4513,
-    /* Body outline */
-    0 0 0 1px var(--tama-dark);
-}
-
-/* Dog head and features */
-.dog::after {
-  content: '';
-  position: absolute;
-  bottom: 8px;
-  left: 20px;
-  width: 14px;
-  height: 12px;
-  background: #8B4513;
-  border-radius: 60% 60% 40% 40%;
-  box-shadow: 
-    /* Head outline */
-    0 0 0 1px var(--tama-dark),
-    /* Ears */
-    -8px -4px 0 -2px #654321,
-    -4px -6px 0 -2px #654321,
-    /* Eyes */
-    -8px 2px 0 -6px black,
-    -4px 2px 0 -6px black,
-    /* Nose */
-    -6px 6px 0 -7px black,
-    /* Tail */
-    -16px -2px 0 -2px #8B4513;
+  background-image: url('https://media3.giphy.com/media/a0tbZW2IxlUEmFcU02/giphy.gif');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
 }
 
 .dog1 {
   animation: frolic1 20s ease-in-out infinite;
-}
-
-.dog1::before {
-  background: #D2691E;
-  box-shadow: 
-    -4px 10px 0 -6px #D2691E,
-    -1px 10px 0 -6px #D2691E,
-    6px 10px 0 -6px #D2691E,
-    9px 10px 0 -6px #D2691E,
-    0 0 0 1px var(--tama-dark);
-}
-
-.dog1::after {
-  background: #D2691E;
-  box-shadow: 
-    0 0 0 1px var(--tama-dark),
-    -8px -4px 0 -2px #B8860B,
-    -4px -6px 0 -2px #B8860B,
-    -8px 2px 0 -6px black,
-    -4px 2px 0 -6px black,
-    -6px 6px 0 -7px black,
-    -16px -2px 0 -2px #D2691E;
 }
 
 .dog2 {
@@ -216,68 +153,76 @@ body::before {
   animation-delay: -10s;
 }
 
-.dog2::before {
-  background: #696969;
-  box-shadow: 
-    -4px 10px 0 -6px #696969,
-    -1px 10px 0 -6px #696969,
-    6px 10px 0 -6px #696969,
-    9px 10px 0 -6px #696969,
-    0 0 0 1px var(--tama-dark);
-}
-
-.dog2::after {
-  background: #696969;
-  box-shadow: 
-    0 0 0 1px var(--tama-dark),
-    -8px -4px 0 -2px #2F4F4F,
-    -4px -6px 0 -2px #2F4F4F,
-    -8px 2px 0 -6px black,
-    -4px 2px 0 -6px black,
-    -6px 6px 0 -7px black,
-    -16px -2px 0 -2px #696969;
-}
-
 @keyframes frolic1 {
   0% { 
     left: 10%; 
     bottom: 60px; 
-    transform: scale(1) rotate(0deg); 
+    transform: scaleX(-1); 
   }
   15% { 
     left: 30%; 
-    bottom: 150px; 
-    transform: scale(1.1) rotate(5deg); 
-  }
-  30% { 
-    left: 60%; 
-    bottom: 40px; 
-    transform: scale(0.9) rotate(-3deg); 
-  }
-  45% { 
-    left: 80%; 
-    bottom: 170px; 
-    transform: scale(1.2) rotate(8deg); 
-  }
-  60% { 
-    left: 70%; 
     bottom: 120px; 
-    transform: scale(1) rotate(-2deg) scaleX(-1); 
+    transform: scaleX(-1); 
   }
-  75% { 
+  /* Dog approaches poop spot slowly */
+  25% { 
     left: 40%; 
-    bottom: 180px; 
-    transform: scale(1.1) rotate(6deg) scaleX(-1); 
+    bottom: 95px; 
+    transform: scaleX(-1); 
   }
-  90% { 
-    left: 20%; 
+  /* Dog stops to poop for 10% of animation (30-35%) */
+  30% { 
+    left: var(--poop1-left, 45%); 
+    bottom: 85px; 
+    transform: scaleX(-1); 
+  }
+  35% { 
+    left: var(--poop1-left, 45%); 
+    bottom: 85px; 
+    transform: scaleX(-1); 
+  }
+  /* Dog leaves poop spot slowly */
+  40% { 
+    left: 50%; 
+    bottom: 95px; 
+    transform: scaleX(-1); 
+  }
+  55% { 
+    left: 75%; 
+    bottom: 140px; 
+    transform: scaleX(-1); 
+  }
+  65% { 
+    left: 85%; 
     bottom: 80px; 
-    transform: scale(0.95) rotate(-4deg) scaleX(-1); 
+    transform: scaleX(-1); 
+  }
+  /* Dog turns around at the edge */
+  70% { 
+    left: 85%; 
+    bottom: 80px; 
+    transform: scaleX(1); 
+  }
+  85% { 
+    left: 50%; 
+    bottom: 160px; 
+    transform: scaleX(1); 
+  }
+  95% { 
+    left: 20%; 
+    bottom: 100px; 
+    transform: scaleX(1); 
+  }
+  /* Dog turns around at the other edge */
+  98% { 
+    left: 10%; 
+    bottom: 60px; 
+    transform: scaleX(-1); 
   }
   100% { 
     left: 10%; 
     bottom: 60px; 
-    transform: scale(1) rotate(0deg); 
+    transform: scaleX(-1); 
   }
 }
 
@@ -285,42 +230,77 @@ body::before {
   0% { 
     left: 75%; 
     bottom: 130px; 
-    transform: scale(1) rotate(0deg); 
+    transform: scaleX(1); 
   }
-  20% { 
-    left: 50%; 
+  12% { 
+    left: 60%; 
     bottom: 180px; 
-    transform: scale(1.15) rotate(-6deg) scaleX(-1); 
+    transform: scaleX(1); 
+  }
+  25% { 
+    left: 40%; 
+    bottom: 120px; 
+    transform: scaleX(1); 
   }
   35% { 
-    left: 25%; 
-    bottom: 50px; 
-    transform: scale(0.85) rotate(4deg) scaleX(-1); 
+    left: 20%; 
+    bottom: 60px; 
+    transform: scaleX(1); 
+  }
+  /* Dog turns around at left edge */
+  40% { 
+    left: 15%; 
+    bottom: 60px; 
+    transform: scaleX(-1); 
   }
   50% { 
-    left: 15%; 
-    bottom: 160px; 
-    transform: scale(1.1) rotate(-8deg) scaleX(-1); 
+    left: 35%; 
+    bottom: 140px; 
+    transform: scaleX(-1); 
   }
+  /* Dog approaches poop spot slowly */
+  60% { 
+    left: 55%; 
+    bottom: 95px; 
+    transform: scaleX(-1); 
+  }
+  /* Dog stops to poop for 10% of animation (65-70%) */
   65% { 
-    left: 45%; 
-    bottom: 35px; 
-    transform: scale(0.9) rotate(3deg); 
+    left: var(--poop2-left, 65%); 
+    bottom: 85px; 
+    transform: scaleX(-1); 
   }
-  80% { 
+  70% { 
+    left: var(--poop2-left, 65%); 
+    bottom: 85px; 
+    transform: scaleX(-1); 
+  }
+  /* Dog leaves poop spot slowly */
+  75% { 
     left: 70%; 
-    bottom: 145px; 
-    transform: scale(1.2) rotate(-5deg); 
+    bottom: 95px; 
+    transform: scaleX(-1); 
   }
-  95% { 
+  85% { 
     left: 85%; 
-    bottom: 70px; 
-    transform: scale(1.05) rotate(2deg); 
+    bottom: 120px; 
+    transform: scaleX(-1); 
+  }
+  92% { 
+    left: 90%; 
+    bottom: 90px; 
+    transform: scaleX(-1); 
+  }
+  /* Dog turns around at right edge */
+  95% { 
+    left: 90%; 
+    bottom: 90px; 
+    transform: scaleX(1); 
   }
   100% { 
     left: 75%; 
     bottom: 130px; 
-    transform: scale(1) rotate(0deg); 
+    transform: scaleX(1); 
   }
 }
 
@@ -328,13 +308,21 @@ body::before {
 .poop {
   position: fixed;
   bottom: 85px;
-  width: 8px;
-  height: 6px;
+  width: 20px;
+  height: 16px;
   background: #8B4513;
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  z-index: -1;
+  z-index: 5;
   opacity: 0;
   animation: poop-appear 60s ease-in-out infinite;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  pointer-events: auto;
+}
+
+.poop:hover {
+  transform: scale(1.3);
+  z-index: 6;
 }
 
 .poop::before {
@@ -349,20 +337,141 @@ body::before {
 }
 
 .poop1 {
-  left: 30%;
-  animation-delay: 8s;
+  left: var(--poop1-left, 45%);
+  animation: poop1-appear 20s ease-in-out infinite;
+  animation-delay: 0s;
 }
 
 .poop2 {
-  left: 65%;
-  animation-delay: 25s;
+  left: var(--poop2-left, 65%);
+  animation: poop2-appear 25s ease-in-out infinite;
+  animation-delay: -10s;
 }
 
-@keyframes poop-appear {
-  0%, 10% { opacity: 0; transform: scale(0); }
-  15%, 85% { opacity: 0.7; transform: scale(1); }
-  90%, 100% { opacity: 0; transform: scale(0.8); }
+/* Poop1 appears when dog1 is pooping (30-35% of 20s cycle) */
+@keyframes poop1-appear {
+  0%, 29% { 
+    opacity: 0; 
+    transform: scale(0); 
+    pointer-events: none; 
+  }
+  30%, 80% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+    pointer-events: auto; 
+  }
+  85%, 100% { 
+    opacity: 0; 
+    transform: scale(0.8); 
+    pointer-events: none; 
+  }
 }
+
+/* Poop2 appears when dog2 is pooping (65-70% of 25s cycle) */
+@keyframes poop2-appear {
+  0%, 64% { 
+    opacity: 0; 
+    transform: scale(0); 
+    pointer-events: none; 
+  }
+  65%, 80% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+    pointer-events: auto; 
+  }
+  85%, 100% { 
+    opacity: 0; 
+    transform: scale(0.8); 
+    pointer-events: none; 
+  }
+}
+
+/* Poop cleaning animation */
+.poop.cleaning {
+  animation: poop-cleanup 2s ease-out forwards;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes poop-cleanup {
+  0% { 
+    opacity: 0.8; 
+    transform: scale(1); 
+  }
+  20% { 
+    opacity: 0.8; 
+    transform: scale(1.1); 
+  }
+  50% { 
+    opacity: 0.6; 
+    transform: scale(0.8) rotate(45deg); 
+  }
+  70% { 
+    opacity: 0.3; 
+    transform: scale(0.5) rotate(90deg); 
+  }
+  90% { 
+    opacity: 0.1; 
+    transform: scale(0.2) rotate(135deg); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(0) rotate(180deg); 
+  }
+}
+
+/* Broom cleaning animation */
+.broom {
+  position: fixed;
+  bottom: 75px;
+  width: 50px;
+  height: 50px;
+  background-image: url('https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExODR1cXhwdWljcXlrZmF6ZG8zc244cmI2ZTFmYjMxb2tuc2oxZXpzMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l0u897CIX2Z5Qpnxcr/giphy.gif');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  animation: broom-sweep 2s ease-out forwards;
+}
+
+@keyframes broom-sweep {
+  0% { 
+    opacity: 0; 
+    transform: scale(0.3) rotate(-30deg) translateY(20px); 
+  }
+  15% { 
+    opacity: 1; 
+    transform: scale(0.8) rotate(-10deg) translateY(10px); 
+  }
+  30% { 
+    opacity: 1; 
+    transform: scale(1) rotate(0deg) translateY(0px); 
+  }
+  45% { 
+    opacity: 1; 
+    transform: scale(1.1) rotate(15deg) translateY(-5px); 
+  }
+  60% { 
+    opacity: 1; 
+    transform: scale(1) rotate(-15deg) translateY(0px); 
+  }
+  75% { 
+    opacity: 1; 
+    transform: scale(1.05) rotate(10deg) translateY(-3px); 
+  }
+  90% { 
+    opacity: 0.8; 
+    transform: scale(0.9) rotate(-5deg) translateY(5px); 
+  }
+  100% { 
+    opacity: 0; 
+    transform: scale(0.3) rotate(0deg) translateY(20px); 
+  }
+}
+
+/* Dog animations now include natural pooping pauses - no separate pooping animation needed */
 
 #root {
   display: flex;

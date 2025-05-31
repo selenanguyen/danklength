@@ -4,27 +4,30 @@ import './PlayerSetup.css';
 
 interface PlayerSetupProps {
   onStartGame: (config: GameConfig) => void;
+  onBackToMain?: () => void;
 }
 
-export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
+export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToMain }) => {
   const [gameMode, setGameMode] = useState<'normal' | 'custom'>('normal');
-  const [players, setPlayers] = useState<string[]>(['']);
+  const [addedPlayers, setAddedPlayers] = useState<string[]>([]);
+  const [newPlayerName, setNewPlayerName] = useState('');
   const [customPrompts, setCustomPrompts] = useState<string[]>(['']);
 
   const addPlayer = () => {
-    setPlayers([...players, '']);
-  };
-
-  const removePlayer = (index: number) => {
-    if (players.length > 1) {
-      setPlayers(players.filter((_, i) => i !== index));
+    if (newPlayerName.trim() !== '') {
+      setAddedPlayers([...addedPlayers, newPlayerName.trim()]);
+      setNewPlayerName('');
     }
   };
 
-  const updatePlayer = (index: number, name: string) => {
-    const newPlayers = [...players];
-    newPlayers[index] = name;
-    setPlayers(newPlayers);
+  const removePlayer = (index: number) => {
+    setAddedPlayers(addedPlayers.filter((_, i) => i !== index));
+  };
+
+  const handleNewPlayerKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      addPlayer();
+    }
   };
 
   const addPrompt = () => {
@@ -44,12 +47,11 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
   };
 
   const handleSubmit = () => {
-    const validPlayers = players.filter(name => name.trim() !== '');
     const validPrompts = gameMode === 'custom' 
       ? customPrompts.filter(prompt => prompt.trim() !== '')
       : undefined;
     
-    if (validPlayers.length < 2) {
+    if (addedPlayers.length < 2) {
       alert('Please add at least 2 players');
       return;
     }
@@ -61,7 +63,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
 
     const config: GameConfig = {
       mode: gameMode,
-      players: validPlayers,
+      players: addedPlayers,
       customPrompts: validPrompts,
     };
 
@@ -104,32 +106,52 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
       </div>
 
       <div className="players-section">
-        <h3>Players ({players.filter(p => p.trim()).length})</h3>
-        <div className="players-list">
-          {players.map((player, index) => (
-            <div key={index} className="player-input">
-              <input
-                type="text"
-                value={player}
-                onChange={(e) => updatePlayer(index, e.target.value)}
-                placeholder={`Player ${index + 1} name`}
-                maxLength={20}
-              />
-              {players.length > 1 && (
+        <h3>Players ({addedPlayers.length})</h3>
+        
+        {/* Added players gallery */}
+        {addedPlayers.length > 0 && (
+          <div className="added-players-gallery">
+            {addedPlayers.map((player, index) => (
+              <div 
+                key={index} 
+                className="player-card"
+                style={{
+                  '--appear-delay': `${index * 0.1}s`,
+                  '--float-delay': `${index * 0.3}s`
+                } as React.CSSProperties}
+              >
+                {player}
                 <button
                   type="button"
                   onClick={() => removePlayer(index)}
-                  className="remove-button"
+                  className="player-card-remove"
+                  title="Remove player"
                 >
                   ×
                 </button>
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* New player input */}
+        <div className="new-player-input">
+          <input
+            type="text"
+            value={newPlayerName}
+            onChange={(e) => setNewPlayerName(e.target.value)}
+            onKeyPress={handleNewPlayerKeyPress}
+            placeholder="Enter player name"
+            maxLength={20}
+          />
+          <button 
+            onClick={addPlayer} 
+            className="add-button"
+            disabled={!newPlayerName.trim()}
+          >
+            + Add Player
+          </button>
         </div>
-        <button onClick={addPlayer} className="add-button">
-          + Add Player
-        </button>
       </div>
 
       {gameMode === 'custom' && (
@@ -167,10 +189,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
       )}
 
       <div className="game-info">
-        <h3>Game Summary</h3>
+        <h3 className="game-summary-title">Game Summary</h3>
         <div className="info-grid">
           <div className="info-item">
-            <strong>Players:</strong> {players.filter(p => p.trim()).length}
+            <strong>Players:</strong> {addedPlayers.length}
           </div>
           <div className="info-item">
             <strong>Mode:</strong> {gameMode === 'normal' ? 'Normal' : 'Custom'}
@@ -196,6 +218,12 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame }) => {
       <button onClick={handleSubmit} className="start-game-button">
         Start Game
       </button>
+      
+      {onBackToMain && (
+        <button onClick={onBackToMain} className="back-button">
+          MAIN MENU
+        </button>
+      )}
     </div>
   );
 };
