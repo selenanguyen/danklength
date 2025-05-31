@@ -10,6 +10,8 @@ interface DialProps {
   disabled?: boolean;
   hidePointer?: boolean;
   hideForNonPsychic?: boolean;
+  isPsychicPhase?: boolean;
+  hideInstructions?: boolean;
 }
 
 export const Dial: React.FC<DialProps> = ({
@@ -20,7 +22,9 @@ export const Dial: React.FC<DialProps> = ({
   onPositionChange,
   disabled = false,
   hidePointer = false,
-  hideForNonPsychic = false
+  hideForNonPsychic = false,
+  isPsychicPhase = false,
+  hideInstructions = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,7 +41,7 @@ export const Dial: React.FC<DialProps> = ({
     const deltaY = centerY - clientY; // Flip Y since screen coordinates are inverted
     
     // Calculate angle in radians
-    let angleRadians = Math.atan2(deltaY, deltaX);
+    const angleRadians = Math.atan2(deltaY, deltaX);
     
     // Convert to degrees and adjust range
     let angleDegrees = angleRadians * (180 / Math.PI);
@@ -51,6 +55,16 @@ export const Dial: React.FC<DialProps> = ({
     // Convert angle to percentage (0% = leftmost, 100% = rightmost)
     const percentage = Math.max(0, Math.min(100, (angleDegrees / 180) * 100));
     const newPosition = Math.round(percentage);
+    
+    console.log('Dial click:', {
+      clientX, clientY,
+      centerX, centerY,
+      deltaX, deltaY,
+      angleRadians: angleRadians * (180 / Math.PI),
+      angleDegrees,
+      percentage,
+      newPosition
+    });
     
     onPositionChange(newPosition);
   }, [onPositionChange, disabled]);
@@ -108,27 +122,111 @@ export const Dial: React.FC<DialProps> = ({
   }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   // Convert position (0-100) to rotation angle (-90 to 90 degrees)
-  const getRotation = (pos: number) => (pos / 100) * 180 - 90;
+  // Flip the rotation to match click direction
+  const getRotation = (pos: number) => 90 - (pos / 100) * 180;
   
-  const getTargetZones = () => {
-    if (!showTarget || targetPosition === undefined) return null;
+  const getTargetStyle = () => {
+    if (!showTarget || targetPosition === undefined) return {};
     
-    const center = targetPosition;
-    const halfWidth = targetWidth / 2;
+    let center = targetPosition;
+    const halfWidth = (targetWidth * 0.9) / 2; // Target area takes up ~20-22% of semicircle
     
-    const centerWidth = halfWidth / 2.5;
-    const innerWidth = halfWidth / 2.5;
+    // Calculate the full target range
+    const leftEdge = center - halfWidth;
+    const rightEdge = center + halfWidth;
+    
+    // If only a small portion would wrap, adjust the center to avoid wrapping
+    const wrapThreshold = halfWidth * 0.15; // 15% of target width
+    
+    if (leftEdge < 0 && Math.abs(leftEdge) < wrapThreshold) {
+      // Small overhang on left - shift right to keep everything visible
+      center = halfWidth;
+    } else if (rightEdge > 100 && (rightEdge - 100) < wrapThreshold) {
+      // Small overhang on right - shift left to keep everything visible  
+      center = 100 - halfWidth;
+    }
+    
+    // Create 5 zones with more balanced proportions
+    const centerWidth = halfWidth / 3;        // Blue center: 1/3 of half
+    const innerWidth = halfWidth / 3.5;       // Purple zones: slightly smaller  
+    const outerWidth = halfWidth / 4;         // Red zones: larger than before
+    
+    // Calculate zone boundaries (allow negative and >100 values)
+    const leftOuterStart = center - centerWidth/2 - innerWidth - outerWidth;
+    const leftOuterEnd = center - centerWidth/2 - innerWidth;
+    const leftInnerStart = leftOuterEnd;
+    const leftInnerEnd = center - centerWidth/2;
+    const centerStart = leftInnerEnd;
+    const centerEnd = center + centerWidth/2;
+    const rightInnerStart = centerEnd;
+    const rightInnerEnd = center + centerWidth/2 + innerWidth;
+    const rightOuterStart = rightInnerEnd;
+    const rightOuterEnd = center + centerWidth/2 + innerWidth + outerWidth;
+    
+    // Clamp only when converting to angles to keep zones visible on semicircle
+    const clampAndConvert = (percent: number) => {
+      const clamped = Math.max(0, Math.min(100, percent));
+      return clamped * 1.8;
+    };
+    
+    // Convert percentages to degrees (0-180 degrees for semicircle)
+    const toAngle = (percent: number) => percent * 1.8;
+    
+    // Helper function to wrap zones that extend beyond 0-100 range
+    const wrapZone = (start: number, end: number, color: string) => {
+      const wrappedPieces = [];
+      
+      if (start < 0 && end > 0) {
+        // Zone spans across the left boundary - split it
+        wrappedPieces.push({ start: 0, end: end, color }); // Visible portion on left
+        wrappedPieces.push({ start: 100 + start, end: 100, color }); // Wrapped portion on right
+      } else if (start < 0 && end <= 0) {
+        // Entire zone is left of 0 - wrap to right side  
+        wrappedPieces.push({ start: 100 + start, end: 100 + end, color });
+      } else if (start >= 100 && end > 100) {
+        // Entire zone is right of 100 - wrap to left side
+        wrappedPieces.push({ start: start - 100, end: end - 100, color });
+      } else if (start < 100 && end > 100) {
+        // Zone spans across the right boundary - split it
+        wrappedPieces.push({ start: start, end: 100, color }); // Visible portion on right
+        wrappedPieces.push({ start: 0, end: end - 100, color }); // Wrapped portion on left
+      } else if (start >= 0 && end <= 100) {
+        // Normal zone within bounds
+        wrappedPieces.push({ start, end, color });
+      }
+      
+      return wrappedPieces;
+    };
+    
+    // Create all zones with wrapping
+    const allZonePieces = [
+      ...wrapZone(leftOuterStart, leftOuterEnd, 'var(--tama-pink)'),
+      ...wrapZone(leftInnerStart, leftInnerEnd, 'var(--tama-purple)'),
+      ...wrapZone(centerStart, centerEnd, 'var(--tama-blue)'),
+      ...wrapZone(rightInnerStart, rightInnerEnd, 'var(--tama-purple)'),
+      ...wrapZone(rightOuterStart, rightOuterEnd, 'var(--tama-pink)')
+    ];
+    
+    // Sort zone pieces by start position to avoid gradient conflicts
+    allZonePieces.sort((a, b) => a.start - b.start);
+    
+    const gradientStops = [`transparent 0deg`];
+    
+    allZonePieces.forEach(zone => {
+      if (zone.start >= 0 && zone.end <= 100 && zone.start < zone.end) {
+        gradientStops.push(`transparent ${clampAndConvert(zone.start)}deg`);
+        gradientStops.push(`${zone.color} ${clampAndConvert(zone.start)}deg`);
+        gradientStops.push(`${zone.color} ${clampAndConvert(zone.end)}deg`);
+        gradientStops.push(`transparent ${clampAndConvert(zone.end)}deg`);
+      }
+    });
+    
+    gradientStops.push(`transparent 180deg`);
     
     return {
-      center: { start: Math.max(0, center - centerWidth/2), end: Math.min(100, center + centerWidth/2) },
-      leftInner: { start: Math.max(0, center - centerWidth/2 - innerWidth), end: Math.max(0, center - centerWidth/2) },
-      rightInner: { start: Math.min(100, center + centerWidth/2), end: Math.min(100, center + centerWidth/2 + innerWidth) },
-      leftOuter: { start: Math.max(0, center - halfWidth), end: Math.max(0, center - centerWidth/2 - innerWidth) },
-      rightOuter: { start: Math.min(100, center + centerWidth/2 + innerWidth), end: Math.min(100, center + halfWidth) }
+      background: `conic-gradient(from 270deg, ${gradientStops.join(', ')})`
     };
   };
-
-  const zones = getTargetZones();
 
   // Hide entire dial for non-psychic players during psychic phase
   if (hideForNonPsychic) {
@@ -142,59 +240,15 @@ export const Dial: React.FC<DialProps> = ({
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        {showTarget && zones && (
-          <>
-            {/* Target zones */}
-            {zones.leftOuter.start < zones.leftOuter.end && (
-              <div 
-                className="target-zone outer"
-                style={{
-                  left: `${zones.leftOuter.start}%`,
-                  width: `${zones.leftOuter.end - zones.leftOuter.start}%`
-                }}
-              />
-            )}
-            {zones.leftInner.start < zones.leftInner.end && (
-              <div 
-                className="target-zone inner"
-                style={{
-                  left: `${zones.leftInner.start}%`,
-                  width: `${zones.leftInner.end - zones.leftInner.start}%`
-                }}
-              />
-            )}
-            {zones.center.start < zones.center.end && (
-              <div 
-                className="target-zone center"
-                style={{
-                  left: `${zones.center.start}%`,
-                  width: `${zones.center.end - zones.center.start}%`
-                }}
-              />
-            )}
-            {zones.rightInner.start < zones.rightInner.end && (
-              <div 
-                className="target-zone inner"
-                style={{
-                  left: `${zones.rightInner.start}%`,
-                  width: `${zones.rightInner.end - zones.rightInner.start}%`
-                }}
-              />
-            )}
-            {zones.rightOuter.start < zones.rightOuter.end && (
-              <div 
-                className="target-zone outer"
-                style={{
-                  left: `${zones.rightOuter.start}%`,
-                  width: `${zones.rightOuter.end - zones.rightOuter.start}%`
-                }}
-              />
-            )}
-          </>
+        {showTarget && (
+          <div 
+            className="target-zone"
+            style={getTargetStyle()}
+          />
         )}
       </div>
       
-      {!hidePointer && (
+      {!hidePointer && !isPsychicPhase && (
         <div
           className={`dial-pointer ${disabled ? 'disabled' : ''} ${isDragging ? 'dragging' : ''}`}
           style={{ transform: `rotate(${getRotation(position)}deg)` }}
@@ -203,7 +257,7 @@ export const Dial: React.FC<DialProps> = ({
       
       <div className="dial-center" />
       
-      {!disabled && !hidePointer && (
+      {!disabled && !hidePointer && !isPsychicPhase && !hideInstructions && (
         <div className="dial-instructions">
           Click anywhere on the dial to move the pointer
         </div>

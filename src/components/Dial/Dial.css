@@ -1,8 +1,8 @@
 .dial-container {
   position: relative;
-  width: 300px;
-  height: 150px;
-  margin: 15px auto;
+  width: 450px;
+  height: 225px;
+  margin: 0 auto;
   overflow: hidden;
   touch-action: none;
   user-select: none;
@@ -12,8 +12,8 @@
 .dial-background {
   position: absolute;
   width: 100%;
-  height: 300px;
-  border-radius: 150px 150px 0 0;
+  height: 450px;
+  border-radius: 225px 225px 0 0;
   background: linear-gradient(180deg, var(--tama-white) 0%, #F0F8FF  100%);
   border: 4px solid var(--tama-green);
   box-shadow: 
@@ -32,34 +32,25 @@
 .target-zone {
   position: absolute;
   top: 0;
-  height: 100%;
-  border-radius: 150px 150px 0 0;
+  left: 0;
+  width: 100%;
+  height: 450px;
+  border-radius: 225px 225px 0 0;
   z-index: 1;
-  opacity: 0.7;
-}
-
-.target-zone.outer {
-  background: linear-gradient(180deg, var(--tama-pink) 0%, #FFB6C1 100%);
-}
-
-.target-zone.inner {
-  background: linear-gradient(180deg, var(--tama-purple) 0%, #DDA0DD 100%);
-}
-
-.target-zone.center {
-  background: linear-gradient(180deg, var(--tama-blue) 0%, #87CEEB 100%);
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .dial-pointer {
   position: absolute;
-  width: 6px;
-  height: 120px;
+  width: 8px;
+  height: 180px;
   background: linear-gradient(to bottom, var(--tama-orange) 0%, var(--tama-yellow) 100%);
   border: 3px solid var(--tama-dark);
-  border-radius: 3px 3px 0 0;
-  top: 30px;
+  border-radius: 4px 4px 0 0;
+  top: 45px;
   left: 50%;
-  transform-origin: 50% 120px;
+  transform-origin: 50% 180px;
   cursor: pointer;
   z-index: 3;
   box-shadow: 
@@ -71,7 +62,7 @@
 .dial-pointer:hover {
   background: linear-gradient(to bottom, var(--tama-yellow) 0%, var(--tama-orange) 100%);
   transform: scale(1.1);
-  transform-origin: 50% 120px;
+  transform-origin: 50% 180px;
   box-shadow: 
     0 4px 8px var(--tama-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -81,7 +72,7 @@
   cursor: grabbing;
   background: linear-gradient(to bottom, #FFD700 0%, #FFA500 100%);
   transform: scale(1.15);
-  transform-origin: 50% 120px;
+  transform-origin: 50% 180px;
   box-shadow: 
     0 6px 12px rgba(255, 165, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
@@ -101,12 +92,12 @@
 
 .dial-center {
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   background: radial-gradient(circle, var(--tama-yellow) 0%, var(--tama-orange) 70%, var(--tama-dark) 100%);
   border: 3px solid var(--tama-dark);
   border-radius: 50%;
-  top: 144px;
+  top: 212px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
@@ -141,6 +132,7 @@
   }
   
   .target-zone {
+    height: 250px;
     border-radius: 125px 125px 0 0;
   }
   
@@ -180,6 +172,7 @@
   }
   
   .target-zone {
+    height: 220px;
     border-radius: 110px 110px 0 0;
   }
   

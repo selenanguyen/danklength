@@ -307,6 +307,91 @@
   text-transform: capitalize;
 }
 
+/* Disconnection overlay styles */
+.disconnection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.disconnection-modal {
+  background: linear-gradient(145deg, var(--tama-white) 0%, #FFF8DC 100%);
+  border: 4px solid #dc3545;
+  border-radius: 25px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 8px 16px var(--tama-shadow);
+  max-width: 400px;
+  width: 90%;
+}
+
+.disconnection-modal h2 {
+  color: #dc3545;
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 800;
+  text-shadow: 1px 1px 2px var(--tama-shadow);
+}
+
+.disconnection-modal p {
+  color: var(--tama-dark);
+  margin-bottom: 30px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.reconnection-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.disconnection-modal .reconnect-button {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.disconnection-modal .reconnect-button:hover {
+  background: linear-gradient(135deg, #20c997, #17a2b8);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.leave-game-button {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.leave-game-button:hover {
+  background: linear-gradient(135deg, #5a6268, #495057);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
 @media (max-width: 768px) {
   .game-container {
     padding: 10px;

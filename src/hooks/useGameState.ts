@@ -97,12 +97,83 @@ export const useGameState = () => {
   }, [generateTarget, generateTargetWidth]);
 
   const submitClue = useCallback((clue: string) => {
-    setGameState(prev => ({
-      ...prev,
-      psychicClue: clue,
-      gamePhase: 'guessing',
-    }));
+    console.log('useGameState.submitClue called with:', clue);
+    setGameState(prev => {
+      console.log('Transitioning from phase:', prev.gamePhase, 'to: guessing');
+      return {
+        ...prev,
+        psychicClue: clue,
+        gamePhase: 'guessing',
+      };
+    });
   }, []);
+
+  // Shared function to calculate the adjusted target center (same logic as Dial component)
+  const getAdjustedTargetCenter = useCallback((targetPos: number, targetWidth: number) => {
+    let center = targetPos;
+    const halfWidth = (targetWidth * 0.9) / 2; // Match the display scaling
+    
+    // Calculate the full target range
+    const leftEdge = center - halfWidth;
+    const rightEdge = center + halfWidth;
+    
+    // If only a small portion would wrap, adjust the center to avoid wrapping
+    const wrapThreshold = halfWidth * 0.15; // 15% of target width
+    
+    if (leftEdge < 0 && Math.abs(leftEdge) < wrapThreshold) {
+      // Small overhang on left - shift right to keep everything visible
+      center = halfWidth;
+    } else if (rightEdge > 100 && (rightEdge - 100) < wrapThreshold) {
+      // Small overhang on right - shift left to keep everything visible  
+      center = 100 - halfWidth;
+    }
+    
+    return center;
+  }, []);
+
+  const calculateScore = useCallback((dialPos: number, targetPos: number, targetWidth: number): ScoreResult => {
+    // Use the same adjusted center position as the visual display
+    const adjustedCenter = getAdjustedTargetCenter(targetPos, targetWidth);
+    
+    // Calculate distance considering wrapping around the spectrum
+    const straightDistance = Math.abs(dialPos - adjustedCenter);
+    const wrapAroundDistance = 100 - straightDistance; // Distance going the other way around
+    const distance = Math.min(straightDistance, wrapAroundDistance);
+    
+    const halfWidth = (targetWidth * 0.9) / 2; // Match the display scaling
+    const centerWidth = halfWidth / 3;        // Blue center: 1/3 of half
+    const innerWidth = halfWidth / 3.5;       // Purple zones: slightly smaller  
+    const outerWidth = halfWidth / 4;         // Red zones: larger than before
+    
+    // Zone boundaries from center outward (total radius from center)
+    const centerZone = centerWidth / 2;                    // Half of center width
+    const innerZone = centerWidth / 2 + innerWidth;        // Center + one inner zone
+    const outerZone = centerWidth / 2 + innerWidth + outerWidth; // Center + inner + outer
+    
+    console.log('Score calculation:', {
+      dialPos,
+      originalTarget: targetPos,
+      adjustedCenter,
+      straightDistance,
+      wrapAroundDistance,
+      distance,
+      centerZone,
+      innerZone,
+      outerZone,
+      halfWidth,
+      targetWidth
+    });
+    
+    if (distance <= centerZone) {
+      return { points: 4, zone: 'center' }; // Blue center
+    } else if (distance <= innerZone) {
+      return { points: 3, zone: 'inner' }; // Purple zones
+    } else if (distance <= outerZone) {
+      return { points: 2, zone: 'outer' }; // Pink/red zones
+    } else {
+      return { points: 0, zone: 'miss' };
+    }
+  }, [getAdjustedTargetCenter]);
 
   const submitGuess = useCallback((position: number) => {
     setGameState(prev => ({
@@ -112,48 +183,36 @@ export const useGameState = () => {
     }));
   }, []);
 
-  const calculateScore = useCallback((dialPos: number, targetPos: number, targetWidth: number): ScoreResult => {
-    const distance = Math.abs(dialPos - targetPos);
-    const centerZone = targetWidth / 6;
-    const innerZone = targetWidth * 2 / 3;
-    const outerZone = targetWidth;
-    
-    if (distance <= centerZone) {
-      return { points: 5, zone: 'center' };
-    } else if (distance <= innerZone) {
-      return { points: 3, zone: 'inner' };
-    } else if (distance <= outerZone) {
-      return { points: 2, zone: 'outer' };
-    } else {
-      return { points: 0, zone: 'miss' };
-    }
-  }, []);
-
   const finishRound = useCallback(() => {
-    const { dialPosition, targetPosition, targetWidth, totalScore, roundScores, currentRound, totalRounds } = gameState;
-    
-    const result = calculateScore(dialPosition, targetPosition, targetWidth);
-    const newTotalScore = totalScore + result.points;
-    const newRoundScores = [...roundScores, result.points];
-    
-    if (currentRound >= totalRounds) {
-      setGameState(prev => ({
-        ...prev,
-        totalScore: newTotalScore,
-        roundScores: newRoundScores,
-        gamePhase: 'ended',
-      }));
-    } else {
-      setGameState(prev => ({
-        ...prev,
-        totalScore: newTotalScore,
-        roundScores: newRoundScores,
-        gamePhase: 'scoring',
-      }));
-    }
-  }, [gameState, calculateScore]);
+    setGameState(prev => {
+      const { dialPosition, targetPosition, targetWidth, totalScore, roundScores, currentRound, totalRounds } = prev;
+      
+      console.log('finishRound called:', { dialPosition, targetPosition, targetWidth });
+      const result = calculateScore(dialPosition, targetPosition, targetWidth);
+      console.log('Score result:', result);
+      
+      const newTotalScore = totalScore + result.points;
+      const newRoundScores = [...roundScores, result.points];
+      
+      if (currentRound >= totalRounds) {
+        return {
+          ...prev,
+          totalScore: newTotalScore,
+          roundScores: newRoundScores,
+          gamePhase: 'ended',
+        };
+      } else {
+        return {
+          ...prev,
+          totalScore: newTotalScore,
+          roundScores: newRoundScores,
+          gamePhase: 'scoring',
+        };
+      }
+    });
+  }, [calculateScore]);
 
-  const initializeAndStartGame = useCallback((config: GameConfig, syncedGameState?: any) => {
+  const initializeAndStartGame = useCallback((config: GameConfig, syncedGameState?: Partial<GameState>) => {
     const players: Player[] = config.players.map((name, index) => ({
       id: `player-${index}`,
       name,

@@ -4,9 +4,11 @@ import './GameSetup.css';
 interface GameSetupProps {
   onStartGame: () => void;
   onStartMultiplayer: () => void;
+  onReconnect?: () => void;
+  cachedGameCode?: string;
 }
 
-export const GameSetup: React.FC<GameSetupProps> = ({ onStartGame, onStartMultiplayer }) => {
+export const GameSetup: React.FC<GameSetupProps> = ({ onStartGame, onStartMultiplayer, onReconnect, cachedGameCode }) => {
   return (
     <div className="game-setup">
       <h1 className="game-title">Wavelength</h1>
@@ -49,12 +51,20 @@ export const GameSetup: React.FC<GameSetupProps> = ({ onStartGame, onStartMultip
       </div>
 
       <div className="play-mode-selection">
-        <button className="start-button local" onClick={onStartGame}>
-          🏠 Local Play
-        </button>
-        <button className="start-button remote" onClick={onStartMultiplayer}>
-          🌐 Remote Play
-        </button>
+        {cachedGameCode && onReconnect && (
+          <button className="reconnect-button" onClick={onReconnect}>
+            🔄 Reconnect to Game {cachedGameCode}
+          </button>
+        )}
+        
+        <div className="button-row">
+          <button className="start-button local" onClick={onStartGame}>
+            🏠 Local Play
+          </button>
+          <button className="start-button remote" onClick={onStartMultiplayer}>
+            🌐 Remote Play
+          </button>
+        </div>
       </div>
     </div>
   );

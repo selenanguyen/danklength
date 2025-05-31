@@ -38,7 +38,20 @@ function getConceptForGame(gameConfig, currentPromptIndex = 0) {
   if (gameConfig.mode === 'custom' && gameConfig.customPrompts && gameConfig.customPrompts.length > 0) {
     // Use custom prompts if available
     const promptIndex = currentPromptIndex % gameConfig.customPrompts.length;
-    return gameConfig.customPrompts[promptIndex];
+    const prompt = gameConfig.customPrompts[promptIndex];
+    
+    // Convert string prompt to concept object
+    if (typeof prompt === 'string') {
+      const parts = prompt.split(' vs ');
+      return {
+        id: `custom-${promptIndex}`,
+        leftConcept: parts[0] || 'Left',
+        rightConcept: parts[1] || 'Right'
+      };
+    } else {
+      // Already an object (fallback)
+      return prompt;
+    }
   } else {
     // Use default random concept
     return getRandomConcept();
@@ -234,6 +247,36 @@ io.on('connection', (socket) => {
       
       socket.join(room.code);
       
+      // If game is in progress, restore player to game cycle
+      if (room.gameState && room.isGameStarted) {
+        const connectedPlayers = room.players.filter(p => p.isConnected);
+        
+        // Rebuild the game state players list with reconnected player
+        room.gameState.players = connectedPlayers.map((p, index) => ({
+          id: `player-${index}`,
+          name: p.name,
+          isConnected: true,
+        }));
+        
+        // Find the reconnecting player's position in the new array
+        const reconnectedPlayerIndex = room.gameState.players.findIndex(p => p.name === playerName);
+        
+        // Adjust psychic index if necessary to maintain game flow
+        if (reconnectedPlayerIndex !== -1) {
+          // If the reconnecting player was supposed to be the current psychic, 
+          // and we're not in the middle of their turn, adjust accordingly
+          const currentPsychicName = room.gameState.players[room.gameState.currentPsychicIndex]?.name;
+          if (!currentPsychicName || room.gameState.gamePhase === 'psychic') {
+            // Reset to a valid psychic index
+            room.gameState.currentPsychicIndex = Math.min(room.gameState.currentPsychicIndex, room.gameState.players.length - 1);
+          }
+        }
+        
+        // Broadcast updated game state to all players
+        io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
+        console.log(`Player ${playerName} restored to game cycle in room ${room.code}`);
+      }
+      
       // Notify other players of reconnection
       socket.to(room.code).emit('player-reconnected', {
         playerId: socket.id,
@@ -251,6 +294,14 @@ io.on('connection', (socket) => {
       }
       
       socket.emit('game-joined', { room: room });
+      
+      // Send current game state if game is in progress
+      if (room.gameState && room.isGameStarted) {
+        socket.emit('game-started', {
+          gameConfig: room.gameState,
+          gameState: room.gameState,
+        });
+      }
       
       // Send existing custom prompts to the reconnected player
       if (room.customPrompts.length > 0) {
@@ -530,6 +581,33 @@ io.on('connection', (socket) => {
               newHostName: newHost.name,
               room: room,
             });
+          }
+        }
+
+        // If game is in progress, adjust the game cycle to skip disconnected players
+        if (room.gameState && room.isGameStarted) {
+          const connectedPlayers = room.players.filter(p => p.isConnected);
+          const disconnectedPlayerIndex = room.gameState.players.findIndex(p => p.name === player.name);
+          
+          if (disconnectedPlayerIndex !== -1 && connectedPlayers.length > 0) {
+            // Update the game state players list to only include connected players
+            room.gameState.players = connectedPlayers.map((p, index) => ({
+              id: `player-${index}`,
+              name: p.name,
+              isConnected: true,
+            }));
+            
+            // Adjust current psychic index if needed
+            if (room.gameState.currentPsychicIndex >= disconnectedPlayerIndex) {
+              // If current psychic disconnected or we need to adjust the index
+              if (room.gameState.currentPsychicIndex >= room.gameState.players.length) {
+                room.gameState.currentPsychicIndex = 0; // Reset to first player
+              }
+            }
+            
+            // Broadcast updated game state to remaining players
+            io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
+            console.log(`Game cycle adjusted for disconnected player ${player.name} in room ${room.code}`);
           }
         }
 

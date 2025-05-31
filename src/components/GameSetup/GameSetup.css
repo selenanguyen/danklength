@@ -110,10 +110,53 @@
 
 .play-mode-selection {
   display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  margin-top: 25px;
+}
+
+.play-mode-selection .button-row {
+  display: flex;
   gap: 18px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-top: 25px;
+}
+
+.reconnect-section {
+  padding: 15px;
+  background: linear-gradient(135deg, #fff3cd, #ffe69c);
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
+}
+
+.reconnect-button {
+  background: linear-gradient(135deg, #ffc107, #e0a800);
+  color: #212529;
+  border: none;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 8px;
+}
+
+.reconnect-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #e0a800, #d39e00);
+}
+
+.reconnect-info {
+  margin: 0;
+  font-size: 14px;
+  color: #856404;
+  font-weight: 600;
 }
 
 .start-button {

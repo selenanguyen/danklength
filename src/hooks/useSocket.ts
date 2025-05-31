@@ -27,7 +27,7 @@ export interface MultiplayerState {
   errors: string[];
   gameStarted: boolean;
   gameConfig: GameConfig | null;
-  syncedGameState: any | null;
+  syncedGameState: Partial<GameState> | null;
   sharedPrompts: string[];
   sharedGameMode: 'normal' | 'custom' | null;
 }
@@ -44,6 +44,46 @@ const initialState: MultiplayerState = {
   syncedGameState: null,
   sharedPrompts: [],
   sharedGameMode: null,
+};
+
+// Helper functions for localStorage cache
+const saveGameSession = (gameCode: string, playerName: string, isHost: boolean) => {
+  try {
+    localStorage.setItem('danklength_cached_game', JSON.stringify({
+      gameCode,
+      playerName,
+      isHost,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    console.warn('Failed to save game session to localStorage:', e);
+  }
+};
+
+const getCachedGameSession = () => {
+  try {
+    const cached = localStorage.getItem('danklength_cached_game');
+    if (cached) {
+      const session = JSON.parse(cached);
+      // Only return session if it's less than 24 hours old
+      if (Date.now() - session.timestamp < 24 * 60 * 60 * 1000) {
+        return session;
+      } else {
+        clearCachedGameSession();
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load cached game session:', e);
+  }
+  return null;
+};
+
+const clearCachedGameSession = () => {
+  try {
+    localStorage.removeItem('danklength_cached_game');
+  } catch (e) {
+    console.warn('Failed to clear cached game session:', e);
+  }
 };
 
 export const useSocket = () => {
@@ -133,6 +173,10 @@ export const useSocket = () => {
 
     // Game events
     socket.on('game-created', (data) => {
+      const hostPlayer = data.room.players.find((p: Player) => p.isHost);
+      if (hostPlayer) {
+        saveGameSession(data.gameCode, hostPlayer.name, true);
+      }
       setMultiplayerState(prev => ({
         ...prev,
         gameCode: data.gameCode,
@@ -142,6 +186,10 @@ export const useSocket = () => {
     });
 
     socket.on('game-joined', (data) => {
+      const currentPlayer = data.room.players.find((p: Player) => p.id === socket.id);
+      if (currentPlayer) {
+        saveGameSession(data.room.code, currentPlayer.name, currentPlayer.isHost);
+      }
       setMultiplayerState(prev => ({
         ...prev,
         gameCode: data.room.code,
@@ -298,7 +346,7 @@ export const useSocket = () => {
     }
   };
 
-  const sendPlayerAction = (action: string, data: any = {}) => {
+  const sendPlayerAction = (action: string, data: Record<string, unknown> = {}) => {
     if (socketRef.current && multiplayerState.gameCode && multiplayerState.currentPlayerId) {
       socketRef.current.emit('player-ready', {
         gameCode: multiplayerState.gameCode,
@@ -330,7 +378,17 @@ export const useSocket = () => {
         gameCode: multiplayerState.gameCode,
       });
     }
+    clearCachedGameSession();
     resetMultiplayer();
+  };
+
+  const reconnectToGame = () => {
+    const cachedSession = getCachedGameSession();
+    if (cachedSession) {
+      joinGame(cachedSession.gameCode, cachedSession.playerName);
+      return true;
+    }
+    return false;
   };
 
   const submitCustomPrompt = (prompt: string) => {
@@ -352,13 +410,13 @@ export const useSocket = () => {
     }
   };
 
-  const addEventListener = (event: string, callback: (...args: any[]) => void) => {
+  const addEventListener = (event: string, callback: (...args: unknown[]) => void) => {
     if (socketRef.current) {
       socketRef.current.on(event, callback);
     }
   };
 
-  const removeEventListener = (event: string, callback: (...args: any[]) => void) => {
+  const removeEventListener = (event: string, callback: (...args: unknown[]) => void) => {
     if (socketRef.current) {
       socketRef.current.off(event, callback);
     }
@@ -375,6 +433,8 @@ export const useSocket = () => {
     clearErrors,
     resetMultiplayer,
     leaveGame,
+    reconnectToGame,
+    getCachedGameSession,
     submitCustomPrompt,
     updateGameMode,
     addEventListener,
