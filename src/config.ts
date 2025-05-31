@@ -1,7 +1,7 @@
 // Configuration for different environments
 export const config = {
   serverUrl: import.meta.env.PROD 
-    ? 'https://5115-141-239-239-18.ngrok-free.app'
+    ? 'https://b5a5-141-239-239-18.ngrok-free.app'
     : 'http://localhost:3001',
   
   isDevelopment: import.meta.env.DEV,
