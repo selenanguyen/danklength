@@ -1,7 +1,7 @@
 .dial-container {
   position: relative;
-  width: 650px;
-  height: 325px;
+  width: min(55vw, 550px);
+  height: min(27.5vw, 275px);
   margin: 0 auto;
   overflow: hidden;
   touch-action: none;
@@ -12,8 +12,8 @@
 .dial-background {
   position: absolute;
   width: 100%;
-  height: 650px;
-  border-radius: 325px 325px 0 0;
+  height: min(55vw, 550px);
+  border-radius: min(27.5vw, 275px) min(27.5vw, 275px) 0 0;
   background: linear-gradient(180deg, var(--tama-white) 0%, #F0F8FF  100%);
   border: 4px solid var(--tama-green);
   box-shadow: 
@@ -28,8 +28,8 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 650px;
-  border-radius: 325px 325px 0 0;
+  height: min(55vw, 550px);
+  border-radius: min(27.5vw, 275px) min(27.5vw, 275px) 0 0;
   z-index: 1;
   opacity: 0.6;
   pointer-events: none;
@@ -38,13 +38,13 @@
 .dial-pointer {
   position: absolute;
   width: 10px;
-  height: 260px;
+  height: min(22vw, 220px);
   background: linear-gradient(to bottom, var(--tama-orange) 0%, var(--tama-yellow) 100%);
   border: 3px solid var(--tama-dark);
   border-radius: 5px 5px 0 0;
-  top: 58px;
+  top: min(4.95vw, 49.5px);
   left: 50%;
-  transform-origin: 50% 260px;
+  transform-origin: 50% min(22vw, 220px);
   cursor: pointer;
   z-index: 3;
   box-shadow: 
@@ -72,12 +72,12 @@
 
 .dial-center {
   position: absolute;
-  width: 34px;
-  height: 34px;
+  width: min(2.9vw, 29px);
+  height: min(2.9vw, 29px);
   background: radial-gradient(circle, var(--tama-yellow) 0%, var(--tama-orange) 70%, var(--tama-dark) 100%);
   border: 4px solid var(--tama-dark);
   border-radius: 50%;
-  top: 308px;
+  top: min(26.1vw, 261px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
@@ -100,82 +100,71 @@
   z-index: 5;
 }
 
+/* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
   .dial-container {
-    width: 250px;
-    height: 125px;
+    width: min(80vw, 400px);
+    height: min(40vw, 200px);
   }
   
   .dial-background {
-    height: 250px;
-    border-radius: 125px 125px 0 0;
+    height: min(80vw, 400px);
+    border-radius: min(40vw, 200px) min(40vw, 200px) 0 0;
   }
   
   .target-zone {
-    height: 250px;
-    border-radius: 125px 125px 0 0;
+    height: min(80vw, 400px);
+    border-radius: min(40vw, 200px) min(40vw, 200px) 0 0;
   }
   
   .dial-pointer {
-    height: 100px;
+    height: min(32vw, 160px);
     width: 5px;
-    top: 25px;
-    transform-origin: 50% 100px;
-  }
-  
-  .dial-pointer:hover,
-  .dial-pointer.dragging {
-    transform-origin: 50% 100px;
+    top: min(8vw, 40px);
+    transform-origin: 50% min(32vw, 160px);
   }
   
   .dial-center {
-    top: 119px;
-    width: 16px;
-    height: 16px;
+    top: min(38vw, 190px);
+    width: min(4vw, 20px);
+    height: min(4vw, 20px);
   }
   
   .dial-instructions {
-    font-size: 11px;
-    bottom: -5px;
+    font-size: min(2.2vw, 11px);
   }
 }
 
 @media (max-width: 480px) {
   .dial-container {
-    width: 220px;
-    height: 110px;
+    width: min(90vw, 300px);
+    height: min(45vw, 150px);
   }
   
   .dial-background {
-    height: 220px;
-    border-radius: 110px 110px 0 0;
+    height: min(90vw, 300px);
+    border-radius: min(45vw, 150px) min(45vw, 150px) 0 0;
   }
   
   .target-zone {
-    height: 220px;
-    border-radius: 110px 110px 0 0;
+    height: min(90vw, 300px);
+    border-radius: min(45vw, 150px) min(45vw, 150px) 0 0;
   }
   
   .dial-pointer {
-    height: 85px;
+    height: min(36vw, 120px);
     width: 4px;
-    top: 25px;
-    transform-origin: 50% 85px;
-  }
-  
-  .dial-pointer:hover,
-  .dial-pointer.dragging {
-    transform-origin: 50% 85px;
+    top: min(9vw, 30px);
+    transform-origin: 50% min(36vw, 120px);
   }
   
   .dial-center {
-    top: 104px;
-    width: 14px;
-    height: 14px;
+    top: min(43vw, 143px);
+    width: min(5vw, 16px);
+    height: min(5vw, 16px);
   }
   
   .dial-instructions {
-    font-size: 10px;
-    bottom: -5px;
+    font-size: min(2.5vw, 10px);
   }
 }
