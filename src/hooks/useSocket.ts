@@ -28,6 +28,8 @@ export interface MultiplayerState {
   gameStarted: boolean;
   gameConfig: GameConfig | null;
   syncedGameState: any | null;
+  sharedPrompts: string[];
+  sharedGameMode: 'normal' | 'custom' | null;
 }
 
 const initialState: MultiplayerState = {
@@ -40,6 +42,8 @@ const initialState: MultiplayerState = {
   gameStarted: false,
   gameConfig: null,
   syncedGameState: null,
+  sharedPrompts: [],
+  sharedGameMode: null,
 };
 
 export const useSocket = () => {
@@ -215,6 +219,24 @@ export const useSocket = () => {
       // This will be handled by the app component
     });
 
+    // Custom prompt synchronization
+    socket.on('prompt-added', (data) => {
+      console.log('Prompt added:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        sharedPrompts: data.prompts,
+      }));
+    });
+
+    // Game mode synchronization
+    socket.on('game-mode-updated', (data) => {
+      console.log('Game mode updated:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        sharedGameMode: data.mode,
+      }));
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -293,6 +315,25 @@ export const useSocket = () => {
     }));
   };
 
+  const submitCustomPrompt = (prompt: string) => {
+    if (socketRef.current && multiplayerState.gameCode && prompt.trim()) {
+      socketRef.current.emit('add-prompt', {
+        gameCode: multiplayerState.gameCode,
+        prompt: prompt.trim(),
+        playerId: multiplayerState.currentPlayerId,
+      });
+    }
+  };
+
+  const updateGameMode = (mode: 'normal' | 'custom') => {
+    if (socketRef.current && multiplayerState.gameCode) {
+      socketRef.current.emit('update-game-mode', {
+        gameCode: multiplayerState.gameCode,
+        mode,
+      });
+    }
+  };
+
   const addEventListener = (event: string, callback: (...args: any[]) => void) => {
     if (socketRef.current) {
       socketRef.current.on(event, callback);
@@ -315,6 +356,8 @@ export const useSocket = () => {
     sendPlayerAction,
     clearErrors,
     resetMultiplayer,
+    submitCustomPrompt,
+    updateGameMode,
     addEventListener,
     removeEventListener,
   };

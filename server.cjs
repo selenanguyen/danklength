@@ -133,6 +133,8 @@ function createGameRoom() {
     gameState: null,
     isGameStarted: false,
     createdAt: new Date(),
+    customPrompts: [],
+    gameMode: 'normal',
   };
 
   gameRooms.set(gameCode, room);
@@ -173,6 +175,11 @@ io.on('connection', (socket) => {
     socket.emit('game-created', {
       gameCode: room.code,
       room: room,
+    });
+
+    // Send initial game mode to the host
+    socket.emit('game-mode-updated', {
+      mode: room.gameMode,
     });
 
     console.log(`Game created: ${room.code} by ${data.playerName}`);
@@ -217,6 +224,22 @@ io.on('connection', (socket) => {
     });
 
     socket.emit('game-joined', { room: room });
+    
+    // Send existing custom prompts to the newly joined player
+    if (room.customPrompts.length > 0) {
+      socket.emit('prompt-added', {
+        prompts: room.customPrompts,
+        addedBy: 'system',
+      });
+    }
+    
+    // Send current game mode to the newly joined player
+    if (room.gameMode) {
+      socket.emit('game-mode-updated', {
+        mode: room.gameMode,
+      });
+    }
+    
     console.log(`${playerName} joined game: ${room.code}`);
   });
 
@@ -328,6 +351,45 @@ io.on('connection', (socket) => {
     console.log(`New round started for game ${room.code}: ${newCard.leftConcept} - ${newCard.rightConcept}`);
   });
 
+  // Handle custom prompt submission
+  socket.on('add-prompt', (data) => {
+    const { gameCode, prompt, playerId } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || room.isGameStarted) return;
+
+    // Add prompt to room's custom prompts
+    if (prompt && prompt.trim() && !room.customPrompts.includes(prompt.trim())) {
+      room.customPrompts.push(prompt.trim());
+      
+      // Broadcast updated prompts to all players in room
+      io.to(room.code).emit('prompt-added', {
+        prompts: room.customPrompts,
+        addedBy: playerId,
+      });
+
+      console.log(`Prompt added to game ${room.code}: "${prompt}" by ${playerId}`);
+    }
+  });
+
+  // Handle game mode updates
+  socket.on('update-game-mode', (data) => {
+    const { gameCode, mode } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || room.isGameStarted || room.host !== socket.id) return;
+
+    // Update room's game mode
+    room.gameMode = mode;
+    
+    // Broadcast updated game mode to all players in room
+    io.to(room.code).emit('game-mode-updated', {
+      mode: mode,
+    });
+
+    console.log(`Game mode updated for game ${room.code}: ${mode}`);
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
@@ -344,15 +406,17 @@ io.on('connection', (socket) => {
           playerName: player.name,
         });
 
-        // If host disconnected and game hasn't started, transfer host
-        if (player.isHost && !room.isGameStarted && room.players.length > 1) {
+        // If host disconnected, transfer host to next connected player
+        if (player.isHost && room.players.length > 1) {
           const newHost = room.players.find(p => p.id !== socket.id && p.isConnected);
           if (newHost) {
             newHost.isHost = true;
             room.host = newHost.id;
+            console.log(`Host transferred from ${player.name} to ${newHost.name} in room ${room.code}`);
             io.to(room.code).emit('host-transferred', {
               newHostId: newHost.id,
               newHostName: newHost.name,
+              room: room,
             });
           }
         }

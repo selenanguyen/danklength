@@ -48,6 +48,14 @@ function App() {
     }
   }, [multiplayerState.syncedGameState, playMode, gameState.gamePhase, syncGameState]);
 
+  // Sync game state changes to other players in multiplayer (for host only)
+  useEffect(() => {
+    if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase !== 'setup') {
+      console.log('Host syncing game state:', gameState);
+      updateGameState(gameState);
+    }
+  }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, updateGameState]);
+
   const handleGameSetup = () => {
     setPlayMode('local');
     initializeGame({ mode: 'normal', players: [] });
@@ -88,7 +96,15 @@ function App() {
   };
 
   const handleNextRound = () => {
-    startNewRound();
+    if (playMode === 'remote') {
+      // In multiplayer, only the host should start new rounds and sync
+      if (multiplayerState.isHost) {
+        startNewRound();
+      }
+    } else {
+      // In local mode, anyone can advance
+      startNewRound();
+    }
   };
 
   const handleFinishGame = () => {
@@ -183,7 +199,8 @@ function App() {
   // Determine if current user is the active psychic in multiplayer
   const currentMultiplayerPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
   const isCurrentPlayerPsychic = playMode === 'local' || 
-    (playMode === 'remote' && currentMultiplayerPlayer && currentPlayer?.name === currentMultiplayerPlayer.name);
+    (playMode === 'remote' && currentMultiplayerPlayer && currentPlayer && 
+     gameState.players.findIndex(p => p.name === currentMultiplayerPlayer.name) === gameState.currentPsychicIndex);
 
   return (
     <div className="game-container full-height">
@@ -221,6 +238,12 @@ function App() {
           <div className="psychic-phase">
             <h3>🔮 {currentPlayer?.name}'s Turn</h3>
             {playMode === 'local' && <p><strong>Others close your eyes!</strong></p>}
+            {playMode === 'remote' && (
+              <p>
+                <strong>Psychic:</strong> {currentPlayer?.name} 
+                {isCurrentPlayerPsychic ? ' (You!)' : ''}
+              </p>
+            )}
             
             {isCurrentPlayerPsychic ? (
               <>
@@ -279,13 +302,21 @@ function App() {
             })()}
             
             {gameState.currentRound < gameState.totalRounds ? (
-              <button className="action-button" onClick={handleNextRound}>
-                Next Round
-              </button>
+              playMode === 'local' || multiplayerState.isHost ? (
+                <button className="action-button" onClick={handleNextRound}>
+                  Next Round
+                </button>
+              ) : (
+                <p>Waiting for host to start next round...</p>
+              )
             ) : (
-              <button className="action-button" onClick={handleFinishGame}>
-                Finish Game
-              </button>
+              playMode === 'local' || multiplayerState.isHost ? (
+                <button className="action-button" onClick={handleFinishGame}>
+                  Finish Game
+                </button>
+              ) : (
+                <p>Waiting for host to finish game...</p>
+              )
             )}
           </div>
         )}

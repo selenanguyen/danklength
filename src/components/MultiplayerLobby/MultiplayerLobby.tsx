@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSocket } from '../../hooks/useSocket';
 import type { GameConfig } from '../../types';
 import './MultiplayerLobby.css';
@@ -19,13 +19,73 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
     startGame,
     clearErrors,
     resetMultiplayer,
+    submitCustomPrompt,
+    updateGameMode,
   } = socketInstance;
 
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
   const [playerName, setPlayerName] = useState('');
   const [gameCodeInput, setGameCodeInput] = useState('');
-  const [gameMode, setGameMode] = useState<'normal' | 'custom'>('normal');
-  const [customPrompts, setCustomPrompts] = useState<string[]>(['']);
+  const [localGameMode, setLocalGameMode] = useState<'normal' | 'custom'>('normal');
+  
+  // Use shared game mode for non-hosts, local for hosts
+  const gameMode = multiplayerState.sharedGameMode || localGameMode;
+  
+  const setGameMode = (mode: 'normal' | 'custom') => {
+    setLocalGameMode(mode);
+    if (multiplayerState.isHost) {
+      updateGameMode(mode);
+    }
+  };
+  const [leftSide, setLeftSide] = useState('');
+  const [rightSide, setRightSide] = useState('');
+  const [autoStartTimer, setAutoStartTimer] = useState<number | null>(null);
+  const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null);
+  const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
+
+  // Use shared prompts from multiplayer state
+  const submittedPrompts = multiplayerState.sharedPrompts;
+  
+  // Auto-start logic when reaching 8 prompts
+  const ROUNDS_FOR_AUTO_START = 8;
+  const AUTO_START_COUNTDOWN = 30;
+
+  // Start countdown when we reach enough prompts
+  useEffect(() => {
+    if (multiplayerState.isHost && gameMode === 'custom' && submittedPrompts.length >= ROUNDS_FOR_AUTO_START) {
+      if (autoStartTimer === null) {
+        // Start the countdown
+        setAutoStartTimer(AUTO_START_COUNTDOWN);
+        
+        const interval = setInterval(() => {
+          setAutoStartTimer(prev => {
+            if (prev === null) return null;
+            if (prev <= 1) {
+              // Auto-start the game
+              handleStartGame();
+              return null;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        setCountdownInterval(interval);
+      }
+    } else if (submittedPrompts.length < ROUNDS_FOR_AUTO_START && autoStartTimer !== null) {
+      // Clear timer if prompts go below threshold (shouldn't happen normally)
+      setAutoStartTimer(null);
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        setCountdownInterval(null);
+      }
+    }
+    
+    return () => {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+      }
+    };
+  }, [submittedPrompts.length, gameMode, multiplayerState.isHost]);
 
   const handleCreateGame = () => {
     if (playerName.trim()) {
@@ -41,19 +101,16 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
 
   const handleStartGame = () => {
     console.log('Start Game button clicked');
-    const validPrompts = gameMode === 'custom' 
-      ? customPrompts.filter(p => p.trim() !== '')
-      : undefined;
 
-    if (gameMode === 'custom' && (!validPrompts || validPrompts.length === 0)) {
-      alert('Please add at least one custom prompt');
+    if (gameMode === 'custom' && submittedPrompts.length === 0) {
+      alert('Please submit at least one custom prompt');
       return;
     }
 
     const config: GameConfig = {
       mode: gameMode,
       players: multiplayerState.players.map(p => p.name),
-      customPrompts: validPrompts,
+      customPrompts: gameMode === 'custom' ? submittedPrompts : undefined,
     };
 
     console.log('Sending start game with config:', config);
@@ -61,20 +118,20 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
     // Don't call onGameStart immediately - wait for 'game-started' event
   };
 
-  const addPrompt = () => {
-    setCustomPrompts([...customPrompts, '']);
-  };
-
-  const removePrompt = (index: number) => {
-    if (customPrompts.length > 1) {
-      setCustomPrompts(customPrompts.filter((_, i) => i !== index));
+  const submitPrompt = () => {
+    if (leftSide.trim() && rightSide.trim()) {
+      const prompt = `${leftSide.trim()} vs ${rightSide.trim()}`;
+      submitCustomPrompt(prompt);
+      setLeftSide('');
+      setRightSide('');
     }
   };
 
-  const updatePrompt = (index: number, prompt: string) => {
-    const newPrompts = [...customPrompts];
-    newPrompts[index] = prompt;
-    setCustomPrompts(newPrompts);
+  const handlePromptKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitPrompt();
+    }
   };
 
   const handleBack = () => {
@@ -85,6 +142,26 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
       setMode('menu');
     } else {
       onBackToLocal();
+    }
+  };
+
+  const copyGameCode = async () => {
+    if (multiplayerState.gameCode) {
+      try {
+        await navigator.clipboard.writeText(multiplayerState.gameCode);
+        setShowCopiedTooltip(true);
+        setTimeout(() => setShowCopiedTooltip(false), 2000);
+      } catch (err) {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = multiplayerState.gameCode;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setShowCopiedTooltip(true);
+        setTimeout(() => setShowCopiedTooltip(false), 2000);
+      }
     }
   };
 
@@ -123,6 +200,17 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
           <h1>Game Lobby</h1>
           <div className="game-code">
             Game Code: <span className="code">{multiplayerState.gameCode}</span>
+            <div className="copy-button-container">
+              <button onClick={copyGameCode} className="copy-button" title="Copy game code">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="2" fill="none"/>
+                </svg>
+              </button>
+              {showCopiedTooltip && (
+                <div className="copied-tooltip">Copied!</div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -139,67 +227,105 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
           </div>
         </div>
 
+        {/* Game mode display for all players */}
+        <div className="game-mode-display">
+          <h3>Game Mode</h3>
+          <div className="mode-options">
+            <label className={`mode-option ${(multiplayerState.isHost ? gameMode === 'normal' : submittedPrompts.length === 0) ? 'selected' : ''} ${!multiplayerState.isHost ? 'read-only' : ''}`}>
+              {multiplayerState.isHost && (
+                <input
+                  type="radio"
+                  value="normal"
+                  checked={gameMode === 'normal'}
+                  onChange={(e) => setGameMode(e.target.value as 'normal')}
+                />
+              )}
+              <div className="mode-content">
+                <h4>Normal Mode</h4>
+                <p>Built-in spectrum concepts</p>
+              </div>
+            </label>
+            
+            <label className={`mode-option ${(multiplayerState.isHost ? gameMode === 'custom' : submittedPrompts.length > 0) ? 'selected' : ''} ${!multiplayerState.isHost ? 'read-only' : ''}`}>
+              {multiplayerState.isHost && (
+                <input
+                  type="radio"
+                  value="custom"
+                  checked={gameMode === 'custom'}
+                  onChange={(e) => setGameMode(e.target.value as 'custom')}
+                />
+              )}
+              <div className="mode-content">
+                <h4>Custom Mode</h4>
+                <p>Create your own concepts</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
         {multiplayerState.isHost && (
           <div className="host-controls">
-            <div className="game-mode-selection">
-              <h3>Game Mode</h3>
-              <div className="mode-options">
-                <label className={`mode-option ${gameMode === 'normal' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    value="normal"
-                    checked={gameMode === 'normal'}
-                    onChange={(e) => setGameMode(e.target.value as 'normal')}
-                  />
-                  <div className="mode-content">
-                    <h4>Normal Mode</h4>
-                    <p>Built-in spectrum concepts</p>
-                  </div>
-                </label>
-                
-                <label className={`mode-option ${gameMode === 'custom' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    value="custom"
-                    checked={gameMode === 'custom'}
-                    onChange={(e) => setGameMode(e.target.value as 'custom')}
-                  />
-                  <div className="mode-content">
-                    <h4>Custom Mode</h4>
-                    <p>Create your own concepts</p>
-                  </div>
-                </label>
-              </div>
-            </div>
 
             {gameMode === 'custom' && (
               <div className="prompts-section">
-                <h3>Custom Prompts</h3>
-                <div className="prompts-list">
-                  {customPrompts.map((prompt, index) => (
-                    <div key={index} className="prompt-input">
-                      <input
-                        type="text"
-                        value={prompt}
-                        onChange={(e) => updatePrompt(index, e.target.value)}
-                        placeholder="e.g. Hot vs Cold"
-                        maxLength={50}
-                      />
-                      {customPrompts.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removePrompt(index)}
-                          className="remove-button"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                <h3>Spectrums</h3>
+                
+                {/* Submitted prompts display */}
+                {submittedPrompts.length > 0 && (
+                  <div className="prompts-gallery">
+                    {submittedPrompts.map((prompt, index) => (
+                      <div 
+                        key={index} 
+                        className="prompt-card" 
+                        style={{ 
+                          '--appear-delay': `${index * 0.1}s`,
+                          '--float-delay': `${index * 0.3}s`
+                        } as React.CSSProperties}
+                      >
+                        {prompt}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Host-only prompt input section */}
+                <div className="prompt-input-section">
+                  <div className="dual-prompt-input-group">
+                    <input
+                      type="text"
+                      value={leftSide}
+                      onChange={(e) => setLeftSide(e.target.value)}
+                      onKeyPress={handlePromptKeyPress}
+                      placeholder="Left Side"
+                      maxLength={25}
+                      className="prompt-side-input"
+                    />
+                    <span className="vs-divider">vs</span>
+                    <input
+                      type="text"
+                      value={rightSide}
+                      onChange={(e) => setRightSide(e.target.value)}
+                      onKeyPress={handlePromptKeyPress}
+                      placeholder="Right Side"
+                      maxLength={25}
+                      className="prompt-side-input"
+                    />
+                    <button 
+                      onClick={submitPrompt} 
+                      disabled={!leftSide.trim() || !rightSide.trim()}
+                      className="submit-prompt-button"
+                    >
+                      Submit
+                    </button>
+                  </div>
                 </div>
-                <button onClick={addPrompt} className="add-button">
-                  + Add Prompt
-                </button>
+
+                {/* Auto-start countdown display */}
+                {autoStartTimer !== null && (
+                  <div className="auto-start-countdown">
+                    🚀 Game starting automatically in {autoStartTimer} seconds...
+                  </div>
+                )}
               </div>
             )}
 
@@ -210,6 +336,68 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
             >
               Start Game
             </button>
+          </div>
+        )}
+
+        {/* Show custom prompts section to non-hosts when in custom mode */}
+        {!multiplayerState.isHost && gameMode === 'custom' && (
+          <div className="prompts-section">
+            <h3>Spectrums</h3>
+            
+            {/* Submitted prompts display */}
+            {submittedPrompts.length > 0 && (
+              <div className="prompts-gallery">
+                {submittedPrompts.map((prompt, index) => (
+                  <div 
+                    key={index} 
+                    className="prompt-card" 
+                    style={{ 
+                      '--appear-delay': `${index * 0.1}s`,
+                      '--float-delay': `${index * 0.3}s`
+                    } as React.CSSProperties}
+                  >
+                    {prompt}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Show message when no prompts yet */}
+            {submittedPrompts.length === 0 && (
+              <p className="waiting-for-prompts">Add some custom spectrums below!</p>
+            )}
+
+            {/* Prompt input section for non-hosts */}
+            <div className="prompt-input-section">
+              <div className="dual-prompt-input-group">
+                <input
+                  type="text"
+                  value={leftSide}
+                  onChange={(e) => setLeftSide(e.target.value)}
+                  onKeyPress={handlePromptKeyPress}
+                  placeholder="Left Side"
+                  maxLength={25}
+                  className="prompt-side-input"
+                />
+                <span className="vs-divider">vs</span>
+                <input
+                  type="text"
+                  value={rightSide}
+                  onChange={(e) => setRightSide(e.target.value)}
+                  onKeyPress={handlePromptKeyPress}
+                  placeholder="Right Side"
+                  maxLength={25}
+                  className="prompt-side-input"
+                />
+                <button 
+                  onClick={submitPrompt} 
+                  disabled={!leftSide.trim() || !rightSide.trim()}
+                  className="submit-prompt-button"
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

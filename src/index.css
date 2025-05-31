@@ -1,68 +1,321 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  /* Tamagotchi Town Color Palette */
+  --tama-sky: linear-gradient(180deg, #87CEEB 0%, #E0F6FF 50%, #FFF8DC 100%);
+  --tama-grass: #7CB342;
+  --tama-dark-grass: #689F2E;
+  --tama-pink: #FF69B4;
+  --tama-yellow: #FFD700;
+  --tama-orange: #FF8C69;
+  --tama-purple: #DA70D6;
+  --tama-blue: #87CEEB;
+  --tama-green: #98FB98;
+  --tama-white: #FFFEF7;
+  --tama-dark: #4A4A4A;
+  --tama-shadow: rgba(74, 74, 74, 0.3);
+  
+  font-family: 'Nunito', 'Comic Sans MS', cursive, sans-serif;
+  line-height: 1.4;
+  font-weight: 600;
+  
+  color: var(--tama-dark);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background: var(--tama-sky);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Tamagotchi Town Background Elements */
+body::before {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: linear-gradient(180deg, var(--tama-grass) 0%, var(--tama-dark-grass) 100%);
+  z-index: -3;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 120px;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--tama-grass) 0px,
+    var(--tama-grass) 20px,
+    var(--tama-dark-grass) 20px,
+    var(--tama-dark-grass) 25px
+  );
+  z-index: -2;
+}
+
+/* Floating clouds */
+.clouds {
+  position: fixed;
+  top: 10%;
+  left: -100px;
+  width: 100px;
+  height: 60px;
+  background: white;
+  border-radius: 50px;
+  opacity: 0.8;
+  z-index: -1;
+  animation: float-clouds 30s linear infinite;
+}
+
+.clouds::before,
+.clouds::after {
+  content: '';
+  position: absolute;
+  background: white;
+  border-radius: 50px;
+}
+
+.clouds::before {
+  width: 50px;
+  height: 40px;
+  top: -20px;
+  left: 10px;
+}
+
+.clouds::after {
+  width: 60px;
+  height: 40px;
+  top: -10px;
+  right: 10px;
+}
+
+@keyframes float-clouds {
+  from { left: -100px; }
+  to { left: 100vw; }
+}
+
+/* Cute flowers scattered around */
+.flower {
+  position: fixed;
+  bottom: 80px;
+  width: 20px;
+  height: 20px;
+  background: var(--tama-pink);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  z-index: -1;
+  animation: sway 3s ease-in-out infinite;
+}
+
+.flower::before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--tama-yellow);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.flower:nth-child(1) { left: 10%; background: var(--tama-pink); animation-delay: 0s; }
+.flower:nth-child(2) { left: 25%; background: var(--tama-purple); animation-delay: 1s; }
+.flower:nth-child(3) { left: 40%; background: var(--tama-orange); animation-delay: 2s; }
+.flower:nth-child(4) { left: 70%; background: var(--tama-blue); animation-delay: 0.5s; }
+.flower:nth-child(5) { left: 85%; background: var(--tama-green); animation-delay: 1.5s; }
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+#root {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+  width: 100%;
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: 2.5em;
   line-height: 1.1;
+  color: var(--tama-dark);
+  text-shadow: 2px 2px 4px var(--tama-shadow);
+  font-weight: 800;
+}
+
+h2 {
+  color: var(--tama-dark);
+  text-shadow: 1px 1px 2px var(--tama-shadow);
+  font-weight: 700;
+}
+
+h3 {
+  color: var(--tama-dark);
+  font-weight: 700;
+}
+
+a {
+  font-weight: 600;
+  color: var(--tama-purple);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: var(--tama-pink);
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
+  border-radius: 25px;
+  border: 3px solid var(--tama-dark);
+  padding: 12px 24px;
   font-size: 1em;
-  font-weight: 500;
+  font-weight: 700;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background: linear-gradient(145deg, var(--tama-white) 0%, #F0F8FF 100%);
+  color: var(--tama-dark);
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px var(--tama-shadow);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+button:hover {
+  background: linear-gradient(145deg, var(--tama-yellow) 0%, var(--tama-orange) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px var(--tama-shadow);
+}
+
+button:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 4px var(--tama-shadow);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 3px solid var(--tama-pink);
+  outline-offset: 2px;
+}
+
+/* Cute bounce animation for interactive elements */
+@keyframes bounce {
+  0%, 20%, 60%, 100% {
+    transform: translateY(0);
   }
-  a:hover {
-    color: #747bff;
+  40% {
+    transform: translateY(-10px);
   }
-  button {
-    background-color: #f9f9f9;
+  80% {
+    transform: translateY(-5px);
   }
+}
+
+.bounce-on-hover:hover {
+  animation: bounce 0.6s ease;
+}
+
+/* Sparkle effect */
+@keyframes sparkle {
+  0% { transform: scale(0) rotate(0deg); opacity: 0; }
+  50% { transform: scale(1) rotate(180deg); opacity: 1; }
+  100% { transform: scale(0) rotate(360deg); opacity: 0; }
+}
+
+.sparkle {
+  position: fixed;
+  pointer-events: none;
+  font-size: 20px;
+  z-index: 1000;
+  animation: sparkle 1s ease-out forwards;
+}
+
+/* Floating hearts animation */
+@keyframes float-hearts {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) scale(1.5) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.floating-heart {
+  position: fixed;
+  pointer-events: none;
+  font-size: 24px;
+  z-index: 1000;
+  color: var(--tama-pink);
+  animation: float-hearts 2s ease-out forwards;
+}
+
+/* Wiggle animation for important elements */
+@keyframes wiggle {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(5deg); }
+  75% { transform: rotate(-5deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+/* Pulse glow effect */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px var(--tama-pink);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--tama-pink), 0 0 30px var(--tama-purple);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Additional cloud variations */
+.clouds:nth-child(2) {
+  top: 20%;
+  animation-delay: -10s;
+  animation-duration: 40s;
+}
+
+.clouds:nth-child(3) {
+  top: 15%;
+  animation-delay: -20s;
+  animation-duration: 35s;
+  opacity: 0.6;
+}
+
+/* Make game containers more bouncy */
+.game-container > * {
+  transition: transform 0.3s ease;
+}
+
+.game-container > *:hover {
+  transform: translateY(-2px);
 }
