@@ -54,8 +54,19 @@ export const useSocket = () => {
           extraHeaders: {
             'ngrok-skip-browser-warning': 'true'
           }
+        },
+        websocket: {
+          extraHeaders: {
+            'ngrok-skip-browser-warning': 'true'
+          }
         }
-      }
+      },
+      // Additional options for better connection stability
+      forceNew: true,
+      reconnection: true,
+      timeout: 20000,
+      // Try polling first, then upgrade to websocket
+      transports: ['polling', 'websocket']
     });
 
     const socket = socketRef.current;
