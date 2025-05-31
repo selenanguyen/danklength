@@ -47,26 +47,34 @@ export const useSocket = () => {
   const [multiplayerState, setMultiplayerState] = useState<MultiplayerState>(initialState);
 
   useEffect(() => {
-    // Connect to server with ngrok bypass header
+    // Connect to server with comprehensive ngrok bypass configuration
     socketRef.current = io(config.serverUrl, {
       transportOptions: {
         polling: {
           extraHeaders: {
-            'ngrok-skip-browser-warning': 'true'
+            'ngrok-skip-browser-warning': 'true',
+            'bypass-tunnel-reminder': 'any'
           }
         },
         websocket: {
           extraHeaders: {
-            'ngrok-skip-browser-warning': 'true'
+            'ngrok-skip-browser-warning': 'true',
+            'bypass-tunnel-reminder': 'any'
           }
         }
       },
-      // Additional options for better connection stability
+      // Additional options for better connection stability and ngrok compatibility
       forceNew: true,
       reconnection: true,
-      timeout: 20000,
-      // Try polling first, then upgrade to websocket
-      transports: ['polling', 'websocket']
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 30000,
+      // Force polling first for better ngrok compatibility
+      transports: ['polling'],
+      // Additional query parameters to bypass ngrok
+      query: {
+        'ngrok-skip-browser-warning': 'true'
+      }
     });
 
     const socket = socketRef.current;
