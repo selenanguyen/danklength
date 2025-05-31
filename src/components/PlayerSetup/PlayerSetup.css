@@ -1,0 +1,196 @@
+.player-setup {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.player-setup h1 {
+  text-align: center;
+  color: #212529;
+  margin-bottom: 30px;
+  font-size: 32px;
+}
+
+.player-setup h3 {
+  color: #495057;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #dee2e6;
+  padding-bottom: 5px;
+}
+
+.game-mode-selection {
+  margin-bottom: 30px;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.mode-option {
+  display: block;
+  padding: 20px;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+}
+
+.mode-option:hover {
+  border-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.05);
+}
+
+.mode-option.selected {
+  border-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.1);
+}
+
+.mode-option input[type="radio"] {
+  display: none;
+}
+
+.mode-content h4 {
+  margin: 0 0 5px 0;
+  color: #212529;
+}
+
+.mode-content p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+.players-section,
+.prompts-section {
+  margin-bottom: 30px;
+}
+
+.players-list,
+.prompts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.player-input,
+.prompt-input {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.player-input input,
+.prompt-input input {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.player-input input:focus,
+.prompt-input input:focus {
+  border-color: #4a90e2;
+}
+
+.remove-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #dc3545;
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+.remove-button:hover {
+  background: #c82333;
+}
+
+.add-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.add-button:hover {
+  background: #218838;
+}
+
+.prompts-hint {
+  color: #6c757d;
+  font-size: 14px;
+  margin-bottom: 15px;
+  font-style: italic;
+}
+
+.game-info {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.info-item {
+  color: #495057;
+  font-size: 14px;
+}
+
+.start-game-button {
+  width: 100%;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  border: none;
+  padding: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.start-game-button:hover {
+  background: linear-gradient(135deg, #357abd, #2968a3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .player-setup {
+    margin: 10px;
+    padding: 15px;
+  }
+  
+  .mode-options {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}

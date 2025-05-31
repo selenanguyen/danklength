@@ -1,0 +1,60 @@
+.spectrum-card {
+  background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  position: relative;
+  width: 90%;
+  max-width: 600px;
+  align-self: center;
+}
+
+.concept-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.left-concept {
+  flex: 1;
+  text-align: left;
+  color: #495057;
+  padding: 10px;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 8px;
+  border-left: 4px solid #ff6b6b;
+}
+
+.right-concept {
+  flex: 1;
+  text-align: right;
+  color: #495057;
+  padding: 10px;
+  background: rgba(74, 144, 226, 0.1);
+  border-radius: 8px;
+  border-right: 4px solid #4a90e2;
+}
+
+.spectrum-divider {
+  flex: 0 0 auto;
+  font-size: 24px;
+  color: #6c757d;
+  margin: 0 20px;
+  font-weight: bold;
+}
+
+.concept-hidden {
+  text-align: center;
+  padding: 20px;
+}
+
+.hidden-text {
+  font-size: 16px;
+  color: #6c757d;
+  font-style: italic;
+}

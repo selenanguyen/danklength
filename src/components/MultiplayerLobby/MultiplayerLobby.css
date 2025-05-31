@@ -1,0 +1,374 @@
+.multiplayer-lobby {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  min-height: 400px;
+}
+
+.multiplayer-lobby h1 {
+  text-align: center;
+  color: #212529;
+  margin-bottom: 30px;
+}
+
+.connection-status {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #4a90e2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.lobby-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.lobby-header h1 {
+  margin-bottom: 10px;
+}
+
+.game-code {
+  font-size: 18px;
+  color: #495057;
+}
+
+.game-code .code {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: #4a90e2;
+  font-size: 24px;
+  background: #f8f9fa;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 2px solid #dee2e6;
+}
+
+.players-section {
+  margin-bottom: 30px;
+}
+
+.players-section h3 {
+  color: #495057;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #dee2e6;
+  padding-bottom: 5px;
+}
+
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.player-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.player-item.disconnected {
+  opacity: 0.6;
+  background: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+.player-name {
+  font-weight: 500;
+  color: #212529;
+}
+
+.host-badge {
+  background: #28a745;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge {
+  background: #dc3545;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.menu-options {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+.menu-button {
+  width: 200px;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.menu-button:hover {
+  background: linear-gradient(135deg, #357abd, #2968a3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.create-form,
+.join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+}
+
+.create-form h2,
+.join-form h2 {
+  color: #212529;
+  margin-bottom: 10px;
+}
+
+.create-form input,
+.join-form input {
+  width: 250px;
+  padding: 12px;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.create-form input:focus,
+.join-form input:focus {
+  border-color: #4a90e2;
+}
+
+.host-controls {
+  margin-bottom: 30px;
+}
+
+.game-mode-selection {
+  margin-bottom: 20px;
+}
+
+.game-mode-selection h3 {
+  color: #495057;
+  margin-bottom: 15px;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.mode-option {
+  display: block;
+  padding: 15px;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+}
+
+.mode-option:hover {
+  border-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.05);
+}
+
+.mode-option.selected {
+  border-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.1);
+}
+
+.mode-option input[type="radio"] {
+  display: none;
+}
+
+.mode-content h4 {
+  margin: 0 0 5px 0;
+  color: #212529;
+  font-size: 14px;
+}
+
+.mode-content p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.prompts-section {
+  margin-bottom: 20px;
+}
+
+.prompts-section h3 {
+  color: #495057;
+  margin-bottom: 15px;
+}
+
+.prompts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.prompt-input {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.prompt-input input {
+  flex: 1;
+  padding: 10px;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.remove-button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: #dc3545;
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-button {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.start-game-button {
+  width: 100%;
+  background: linear-gradient(135deg, #28a745, #218838);
+  color: white;
+  border: none;
+  padding: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.start-game-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #218838, #1e7e34);
+  transform: translateY(-2px);
+}
+
+.start-game-button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.waiting-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.back-button {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 20px;
+  transition: background-color 0.3s ease;
+}
+
+.back-button:hover {
+  background: #5a6268;
+}
+
+.error-messages {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+}
+
+.error-message {
+  color: #721c24;
+  margin-bottom: 5px;
+}
+
+.clear-errors {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .multiplayer-lobby {
+    margin: 10px;
+    padding: 15px;
+  }
+  
+  .mode-options {
+    grid-template-columns: 1fr;
+  }
+  
+  .menu-button {
+    width: 100%;
+  }
+  
+  .create-form input,
+  .join-form input {
+    width: 100%;
+    max-width: 300px;
+  }
+}

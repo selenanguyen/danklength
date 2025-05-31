@@ -1,0 +1,128 @@
+.game-setup {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.game-title {
+  font-size: 48px;
+  font-weight: bold;
+  color: #212529;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.game-description {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 30px;
+  margin-bottom: 30px;
+  text-align: left;
+}
+
+.game-description p {
+  font-size: 18px;
+  color: #495057;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.rules-summary h3,
+.scoring-info h3 {
+  color: #212529;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #dee2e6;
+  padding-bottom: 5px;
+}
+
+.rules-summary ol {
+  color: #495057;
+  line-height: 1.6;
+  margin-bottom: 25px;
+}
+
+.rules-summary li {
+  margin-bottom: 8px;
+}
+
+.score-zones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.zone-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zone-color {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.zone-color.bullseye {
+  background: #ff6b6b;
+}
+
+.zone-color.close {
+  background: #ffa726;
+}
+
+.zone-color.okay {
+  background: #ffee58;
+}
+
+.zone-color.miss {
+  background: #e0e0e0;
+}
+
+.scoring-info p {
+  font-size: 14px;
+  color: #6c757d;
+  font-style: italic;
+  text-align: left;
+}
+
+.play-mode-selection {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  min-width: 150px;
+}
+
+.start-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.start-button.local:hover {
+  background: linear-gradient(135deg, #357abd, #2968a3);
+}
+
+.start-button.remote {
+  background: linear-gradient(135deg, #28a745, #218838);
+}
+
+.start-button.remote:hover {
+  background: linear-gradient(135deg, #218838, #1e7e34);
+}

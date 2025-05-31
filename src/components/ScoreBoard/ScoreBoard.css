@@ -1,0 +1,70 @@
+.scoreboard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.team-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.team-score.active {
+  background: rgba(74, 144, 226, 0.1);
+  border: 2px solid #4a90e2;
+  transform: scale(1.05);
+}
+
+.team-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 5px;
+}
+
+.score {
+  font-size: 36px;
+  font-weight: bold;
+  color: #212529;
+  line-height: 1;
+}
+
+.target {
+  font-size: 14px;
+  color: #6c757d;
+  margin-top: 2px;
+}
+
+.game-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.current-phase {
+  font-size: 14px;
+  color: #6c757d;
+  text-transform: capitalize;
+  margin-bottom: 5px;
+  padding: 4px 8px;
+  background: rgba(108, 117, 125, 0.1);
+  border-radius: 4px;
+}
+
+.vs {
+  font-size: 20px;
+  font-weight: bold;
+  color: #495057;
+}

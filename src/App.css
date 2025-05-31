@@ -1,0 +1,321 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: #333;
+}
+
+.game-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+}
+
+.game-controls {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 30px;
+  margin-top: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  z-index: 10;
+  position: relative;
+  width: 90%;
+  max-width: 600px;
+  align-self: center;
+}
+
+.game-controls h3 {
+  margin-bottom: 15px;
+  color: #212529;
+  font-size: 24px;
+}
+
+.game-controls p {
+  margin-bottom: 20px;
+  color: #495057;
+  line-height: 1.5;
+}
+
+.clue-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: center;
+  align-items: center;
+}
+
+.clue-input input {
+  flex: 1;
+  max-width: 300px;
+  padding: 12px;
+  border: 2px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.clue-input input:focus {
+  border-color: #4a90e2;
+}
+
+.clue-input button,
+.action-button {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.clue-input button:hover,
+.action-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #357abd, #2968a3);
+}
+
+.clue-input button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.opposing-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.action-button.left {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+}
+
+.action-button.right {
+  background: linear-gradient(135deg, #4ecdc4, #44a08d);
+}
+
+.action-button.left:hover {
+  background: linear-gradient(135deg, #ee5a52, #dc5144);
+}
+
+.action-button.right:hover {
+  background: linear-gradient(135deg, #44a08d, #3a8f7e);
+}
+
+.game-ended {
+  text-align: center;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.game-ended h1 {
+  font-size: 48px;
+  margin-bottom: 30px;
+  background: linear-gradient(135deg, #ffd700, #ffed4a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.game-header {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  position: relative;
+  width: 90%;
+  max-width: 600px;
+  align-self: center;
+}
+
+.game-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+
+.round-info {
+  color: #495057;
+  font-size: 16px;
+}
+
+.score-info {
+  color: #28a745;
+  font-size: 18px;
+}
+
+.final-score {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.score-display {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  color: white;
+  padding: 30px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.total-score {
+  font-size: 48px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.score-details {
+  font-size: 16px;
+  opacity: 0.9;
+  margin-top: 5px;
+}
+
+.round-breakdown {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.round-breakdown h3 {
+  margin-bottom: 15px;
+  color: #212529;
+}
+
+.rounds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.round-score {
+  background: white;
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid #dee2e6;
+}
+
+.round-label {
+  display: block;
+  font-size: 12px;
+  color: #6c757d;
+  margin-bottom: 2px;
+}
+
+.round-points {
+  display: block;
+  font-size: 16px;
+  font-weight: bold;
+  color: #495057;
+}
+
+.players-list-final {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.players-list-final h3 {
+  margin-bottom: 10px;
+  color: #212529;
+}
+
+.players {
+  color: #495057;
+  font-size: 16px;
+}
+
+.player-name {
+  font-weight: 500;
+}
+
+.score-result {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.points-earned {
+  font-size: 36px;
+  font-weight: bold;
+  color: #28a745;
+  margin-bottom: 5px;
+}
+
+.zone-hit {
+  font-size: 16px;
+  color: #6c757d;
+  text-transform: capitalize;
+}
+
+@media (max-width: 768px) {
+  .game-container {
+    padding: 10px;
+  }
+  
+  .game-header,
+  .game-controls,
+  .spectrum-card {
+    max-width: 100%;
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+  
+  .game-progress {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+  
+  .clue-input {
+    flex-direction: column;
+  }
+  
+  .clue-input input {
+    max-width: none;
+  }
+  
+  .opposing-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .action-button {
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  .total-score {
+    font-size: 36px;
+  }
+  
+  .rounds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  }
+}
