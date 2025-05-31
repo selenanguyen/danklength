@@ -59,7 +59,8 @@ function App() {
   // Listen for dial updates from other players (host only)
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase === 'guessing') {
-      const handleDialUpdate = (data: { position: number; playerId: string }) => {
+      const handleDialUpdate = (...args: unknown[]) => {
+        const data = args[0] as { position: number; playerId: string };
         console.log('Host received dial update during guessing:', data);
         // Update local dial position and then process the guess
         updateDialPosition(data.position);

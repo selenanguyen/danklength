@@ -170,7 +170,7 @@ export const Dial: React.FC<DialProps> = ({
     };
     
     // Convert percentages to degrees (0-180 degrees for semicircle)
-    const toAngle = (percent: number) => percent * 1.8;
+    // const toAngle = (percent: number) => percent * 1.8;
     
     // Helper function to wrap zones that extend beyond 0-100 range
     const wrapZone = (start: number, end: number, color: string) => {
