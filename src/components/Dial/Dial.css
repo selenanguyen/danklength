@@ -1,9 +1,9 @@
 .dial-container {
   position: relative;
   width: 400px;
-  height: 220px;
+  height: 200px;
   margin: 20px auto;
-  overflow: visible;
+  overflow: hidden; /* Hide the bottom half */
   touch-action: none;
   user-select: none;
   z-index: 1;
@@ -73,7 +73,7 @@
   cursor: grab;
   z-index: 3;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 0.1s ease;
+  transition: transform 0.3s ease-out;
 }
 
 .dial-pointer:hover {
@@ -117,7 +117,7 @@
 
 .dial-instructions {
   position: absolute;
-  bottom: -30px;
+  bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 14px;

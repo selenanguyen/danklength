@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameState } from './hooks/useGameState';
+import { useSocket } from './hooks/useSocket';
 import { GameSetup } from './components/GameSetup/GameSetup';
 import { PlayerSetup } from './components/PlayerSetup/PlayerSetup';
 import { MultiplayerLobby } from './components/MultiplayerLobby/MultiplayerLobby';
@@ -20,10 +21,32 @@ function App() {
     resetGame,
     updateDialPosition,
     calculateScore,
+    syncGameState,
   } = useGameState();
+
+  const socketInstance = useSocket();
+  const { multiplayerState, updateGameState } = socketInstance;
 
   const [clueInput, setClueInput] = useState('');
   const [playMode, setPlayMode] = useState<'local' | 'remote' | null>(null);
+
+  // Listen for multiplayer game start events
+  useEffect(() => {
+    if (multiplayerState.gameStarted && multiplayerState.gameConfig) {
+      console.log('Game started, initializing:', multiplayerState.gameConfig);
+      console.log('Synced game state:', multiplayerState.syncedGameState);
+      initializeAndStartGame(multiplayerState.gameConfig, multiplayerState.syncedGameState);
+    }
+  }, [multiplayerState.gameStarted, multiplayerState.gameConfig, multiplayerState.syncedGameState, initializeAndStartGame]);
+
+  // Listen for game state updates in multiplayer
+  useEffect(() => {
+    if (playMode === 'remote' && multiplayerState.syncedGameState && gameState.gamePhase !== 'setup') {
+      console.log('Received game state update:', multiplayerState.syncedGameState);
+      // Apply the synced game state updates
+      syncGameState(multiplayerState.syncedGameState);
+    }
+  }, [multiplayerState.syncedGameState, playMode, gameState.gamePhase, syncGameState]);
 
   const handleGameSetup = () => {
     setPlayMode('local');
@@ -38,10 +61,6 @@ function App() {
     initializeAndStartGame(config);
   };
 
-  const handleMultiplayerGameStart = (config: GameConfig) => {
-    initializeAndStartGame(config);
-  };
-
   const handleBackToWelcome = () => {
     setPlayMode(null);
     resetGame();
@@ -51,6 +70,16 @@ function App() {
     if (clueInput.trim()) {
       submitClue(clueInput);
       setClueInput('');
+      
+      // Sync state to other players in multiplayer mode
+      if (playMode === 'remote') {
+        const newGameState = {
+          ...gameState,
+          psychicClue: clueInput,
+          gamePhase: 'guessing' as const,
+        };
+        updateGameState(newGameState);
+      }
     }
   };
 
@@ -68,22 +97,32 @@ function App() {
 
   // Welcome screen
   if (gameState.gamePhase === 'setup' && playMode === null) {
-    return <GameSetup onStartGame={handleGameSetup} onStartMultiplayer={handleMultiplayerSetup} />;
+    return (
+      <div className="game-container compact">
+        <GameSetup onStartGame={handleGameSetup} onStartMultiplayer={handleMultiplayerSetup} />
+      </div>
+    );
   }
 
   // Multiplayer lobby
   if (playMode === 'remote' && gameState.gamePhase === 'setup') {
     return (
-      <MultiplayerLobby 
-        onGameStart={handleMultiplayerGameStart}
-        onBackToLocal={handleBackToWelcome}
-      />
+      <div className="game-container compact">
+        <MultiplayerLobby 
+          onBackToLocal={handleBackToWelcome}
+          socketInstance={socketInstance}
+        />
+      </div>
     );
   }
 
   // Player setup screen (local only)
   if (gameState.gamePhase === 'player-setup' && playMode === 'local') {
-    return <PlayerSetup onStartGame={handlePlayerSetup} />;
+    return (
+      <div className="game-container compact">
+        <PlayerSetup onStartGame={handlePlayerSetup} />
+      </div>
+    );
   }
 
   // Game ended screen
@@ -93,7 +132,7 @@ function App() {
     const percentage = Math.round((totalScore / maxPossibleScore) * 100);
     
     return (
-      <div className="game-container">
+      <div className="game-container compact">
         <div className="game-ended">
           <h1>🎉 Game Complete! 🎉</h1>
           
@@ -140,9 +179,14 @@ function App() {
 
   const currentPlayer = gameState.players[gameState.currentPsychicIndex];
   const showTarget = gameState.gamePhase === 'scoring';
+  
+  // Determine if current user is the active psychic in multiplayer
+  const currentMultiplayerPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
+  const isCurrentPlayerPsychic = playMode === 'local' || 
+    (playMode === 'remote' && currentMultiplayerPlayer && currentPlayer?.name === currentMultiplayerPlayer.name);
 
   return (
-    <div className="game-container">
+    <div className="game-container full-height">
       <div className="game-header">
         <div className="game-progress">
           <span className="round-info">
@@ -157,7 +201,7 @@ function App() {
       {gameState.currentCard && (
         <SpectrumCard
           concept={gameState.currentCard}
-          showConcepts={gameState.gamePhase !== 'guessing'}
+          showConcepts={true}
         />
       )}
 
@@ -165,29 +209,38 @@ function App() {
         position={gameState.dialPosition}
         targetPosition={gameState.targetPosition}
         targetWidth={gameState.targetWidth}
-        showTarget={showTarget}
+        showTarget={showTarget || (gameState.gamePhase === 'psychic' && isCurrentPlayerPsychic)}
         onPositionChange={updateDialPosition}
-        disabled={gameState.gamePhase === 'psychic' || gameState.gamePhase === 'scoring'}
+        disabled={gameState.gamePhase === 'psychic' || gameState.gamePhase === 'scoring' || (gameState.gamePhase === 'guessing' && isCurrentPlayerPsychic)}
+        hidePointer={gameState.gamePhase === 'psychic' && isCurrentPlayerPsychic}
+        hideForNonPsychic={gameState.gamePhase === 'psychic' && !isCurrentPlayerPsychic}
       />
 
       <div className="game-controls">
         {gameState.gamePhase === 'psychic' && (
           <div className="psychic-phase">
             <h3>🔮 {currentPlayer?.name}'s Turn</h3>
-            <p><strong>Others close your eyes!</strong></p>
-            <p>Give your team a clue for where the target is on this spectrum:</p>
-            <div className="clue-input">
-              <input
-                type="text"
-                value={clueInput}
-                onChange={(e) => setClueInput(e.target.value)}
-                placeholder="Enter your clue..."
-                onKeyPress={(e) => e.key === 'Enter' && handleSubmitClue()}
-              />
-              <button onClick={handleSubmitClue} disabled={!clueInput.trim()}>
-                Submit Clue
-              </button>
-            </div>
+            {playMode === 'local' && <p><strong>Others close your eyes!</strong></p>}
+            
+            {isCurrentPlayerPsychic ? (
+              <>
+                <p>Give your team a clue for where the target is on this spectrum:</p>
+                <div className="clue-input">
+                  <input
+                    type="text"
+                    value={clueInput}
+                    onChange={(e) => setClueInput(e.target.value)}
+                    placeholder="Enter your clue..."
+                    onKeyPress={(e) => e.key === 'Enter' && handleSubmitClue()}
+                  />
+                  <button onClick={handleSubmitClue} disabled={!clueInput.trim()}>
+                    Submit Clue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p>Waiting for {currentPlayer?.name} to give a clue...</p>
+            )}
           </div>
         )}
 
@@ -195,10 +248,16 @@ function App() {
           <div className="guessing-phase">
             <h3>🎯 Team Guessing</h3>
             <p><strong>Clue:</strong> "{gameState.psychicClue}"</p>
-            <p>Work together to position the dial where you think the target is!</p>
-            <button className="action-button" onClick={handleSubmitGuess}>
-              Lock In Guess
-            </button>
+            {isCurrentPlayerPsychic ? (
+              <p>Watch your team work together to guess the target position!</p>
+            ) : (
+              <>
+                <p>Work together to position the dial where you think the target is!</p>
+                <button className="action-button" onClick={handleSubmitGuess}>
+                  Lock In Guess
+                </button>
+              </>
+            )}
           </div>
         )}
 

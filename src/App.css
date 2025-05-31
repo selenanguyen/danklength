@@ -4,6 +4,13 @@
   padding: 0;
 }
 
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
@@ -11,18 +18,33 @@ body {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
   color: #333;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 .game-container {
+  width: 100%;
   max-width: 800px;
-  margin: 0 auto;
   padding: 20px;
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   text-align: center;
+  box-sizing: border-box;
+}
+
+.game-container.full-height {
+  min-height: 100vh;
+}
+
+.game-container.compact {
+  min-height: auto;
+  justify-content: center;
+  padding: 40px 20px;
 }
 
 .game-controls {

@@ -4,13 +4,13 @@ import type { GameConfig } from '../../types';
 import './MultiplayerLobby.css';
 
 interface MultiplayerLobbyProps {
-  onGameStart: (config: GameConfig) => void;
   onBackToLocal: () => void;
+  socketInstance: ReturnType<typeof useSocket>;
 }
 
 export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
-  onGameStart,
   onBackToLocal,
+  socketInstance,
 }) => {
   const { 
     multiplayerState, 
@@ -19,7 +19,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
     startGame,
     clearErrors,
     resetMultiplayer,
-  } = useSocket();
+  } = socketInstance;
 
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
   const [playerName, setPlayerName] = useState('');
@@ -40,6 +40,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   };
 
   const handleStartGame = () => {
+    console.log('Start Game button clicked');
     const validPrompts = gameMode === 'custom' 
       ? customPrompts.filter(p => p.trim() !== '')
       : undefined;
@@ -55,8 +56,9 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
       customPrompts: validPrompts,
     };
 
+    console.log('Sending start game with config:', config);
     startGame(config);
-    onGameStart(config);
+    // Don't call onGameStart immediately - wait for 'game-started' event
   };
 
   const addPrompt = () => {

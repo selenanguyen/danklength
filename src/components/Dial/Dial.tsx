@@ -8,6 +8,8 @@ interface DialProps {
   showTarget?: boolean;
   onPositionChange: (position: number) => void;
   disabled?: boolean;
+  hidePointer?: boolean;
+  hideForNonPsychic?: boolean;
 }
 
 export const Dial: React.FC<DialProps> = ({
@@ -16,12 +18,20 @@ export const Dial: React.FC<DialProps> = ({
   targetWidth = 20,
   showTarget = false,
   onPositionChange,
-  disabled = false
+  disabled = false,
+  hidePointer = false,
+  hideForNonPsychic = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [animatingToPosition, setAnimatingToPosition] = useState(position);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const updatePosition = useCallback((clientX: number, clientY: number) => {
+  // Update animating position when position prop changes
+  useEffect(() => {
+    setAnimatingToPosition(position);
+  }, [position]);
+
+  const updatePosition = useCallback((clientX: number, clientY: number, smooth: boolean = false) => {
     if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -47,7 +57,17 @@ export const Dial: React.FC<DialProps> = ({
     
     // Convert to percentage (0% = leftmost, 100% = rightmost)
     const percentage = (angleDegrees / 180) * 100;
-    onPositionChange(Math.round(percentage));
+    const newPosition = Math.round(percentage);
+    
+    if (smooth) {
+      setAnimatingToPosition(newPosition);
+      // Use a small delay to let the animation complete before updating the actual position
+      setTimeout(() => {
+        onPositionChange(newPosition);
+      }, 100);
+    } else {
+      onPositionChange(newPosition);
+    }
   }, [onPositionChange]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -60,7 +80,7 @@ export const Dial: React.FC<DialProps> = ({
   const handleDialAreaClick = useCallback((e: React.MouseEvent) => {
     if (disabled) return;
     e.preventDefault();
-    updatePosition(e.clientX, e.clientY);
+    updatePosition(e.clientX, e.clientY, true); // Smooth animation for clicks
   }, [disabled, updatePosition]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -86,7 +106,7 @@ export const Dial: React.FC<DialProps> = ({
     if (disabled) return;
     e.preventDefault();
     const touch = e.touches[0];
-    updatePosition(touch.clientX, touch.clientY);
+    updatePosition(touch.clientX, touch.clientY, true); // Smooth animation for touches
   }, [disabled, updatePosition]);
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
@@ -100,6 +120,7 @@ export const Dial: React.FC<DialProps> = ({
     e.preventDefault();
     setIsDragging(false);
   }, []);
+
 
   useEffect(() => {
     if (isDragging) {
@@ -125,14 +146,39 @@ export const Dial: React.FC<DialProps> = ({
     const center = targetPosition;
     const halfWidth = targetWidth / 2;
     
+    // Helper function to wrap zones that go below 0 or above 100
+    const wrapZone = (start: number, end: number) => {
+      const zones = [];
+      
+      if (start < 0) {
+        // Part of the zone wraps to the right side (80-100)
+        zones.push({ start: 100 + start, end: 100 }); // Right side wrap
+        zones.push({ start: 0, end: Math.min(end, 100) }); // Left side remainder
+      } else if (end > 100) {
+        // Part of the zone wraps to the left side (0-20)
+        zones.push({ start: Math.max(start, 0), end: 100 }); // Right side remainder
+        zones.push({ start: 0, end: end - 100 }); // Left side wrap
+      } else {
+        // Normal zone, no wrapping needed
+        zones.push({ start: Math.max(start, 0), end: Math.min(end, 100) });
+      }
+      
+      return zones;
+    };
+    
     return {
-      center: { start: center - halfWidth/3, end: center + halfWidth/3 },
-      inner: { start: center - halfWidth*2/3, end: center + halfWidth*2/3 },
-      outer: { start: center - halfWidth, end: center + halfWidth }
+      center: wrapZone(center - halfWidth/3, center + halfWidth/3),
+      inner: wrapZone(center - halfWidth*2/3, center + halfWidth*2/3),
+      outer: wrapZone(center - halfWidth, center + halfWidth)
     };
   };
 
   const zones = getTargetZones();
+
+  // Hide entire dial for non-psychic players during psychic phase
+  if (hideForNonPsychic) {
+    return null;
+  }
 
   return (
     <div className="dial-container" ref={containerRef}>
@@ -143,62 +189,65 @@ export const Dial: React.FC<DialProps> = ({
       >
         {showTarget && zones && (
           <>
-            <div 
-              className="target-zone outer"
-              style={{
-                background: `conic-gradient(from 180deg, 
-                  transparent ${zones.outer.start * 1.8}deg, 
-                  #ffb3b3 ${zones.outer.start * 1.8}deg, 
-                  #ffb3b3 ${zones.outer.end * 1.8}deg, 
-                  transparent ${zones.outer.end * 1.8}deg)`
-              }}
-            />
-            <div 
-              className="target-zone inner"
-              style={{
-                background: `conic-gradient(from 180deg, 
-                  transparent ${zones.inner.start * 1.8}deg, 
-                  #e6e6fa ${zones.inner.start * 1.8}deg, 
-                  #e6e6fa ${zones.inner.end * 1.8}deg, 
-                  transparent ${zones.inner.end * 1.8}deg)`
-              }}
-            />
-            <div 
-              className="target-zone center"
-              style={{
-                background: `conic-gradient(from 180deg, 
-                  transparent ${zones.center.start * 1.8}deg, 
-                  #4a90e2 ${zones.center.start * 1.8}deg, 
-                  #4a90e2 ${zones.center.end * 1.8}deg, 
-                  transparent ${zones.center.end * 1.8}deg)`
-              }}
-            />
+            {/* Outer zones */}
+            {zones.outer.map((zone, index) => (
+              <div 
+                key={`outer-${index}`}
+                className="target-zone outer"
+                style={{
+                  background: `conic-gradient(from 180deg, 
+                    transparent ${zone.start * 1.8}deg, 
+                    #ffb3b3 ${zone.start * 1.8}deg, 
+                    #ffb3b3 ${zone.end * 1.8}deg, 
+                    transparent ${zone.end * 1.8}deg)`
+                }}
+              />
+            ))}
+            {/* Inner zones */}
+            {zones.inner.map((zone, index) => (
+              <div 
+                key={`inner-${index}`}
+                className="target-zone inner"
+                style={{
+                  background: `conic-gradient(from 180deg, 
+                    transparent ${zone.start * 1.8}deg, 
+                    #e6e6fa ${zone.start * 1.8}deg, 
+                    #e6e6fa ${zone.end * 1.8}deg, 
+                    transparent ${zone.end * 1.8}deg)`
+                }}
+              />
+            ))}
+            {/* Center zones */}
+            {zones.center.map((zone, index) => (
+              <div 
+                key={`center-${index}`}
+                className="target-zone center"
+                style={{
+                  background: `conic-gradient(from 180deg, 
+                    transparent ${zone.start * 1.8}deg, 
+                    #4a90e2 ${zone.start * 1.8}deg, 
+                    #4a90e2 ${zone.end * 1.8}deg, 
+                    transparent ${zone.end * 1.8}deg)`
+                }}
+              />
+            ))}
           </>
         )}
       </div>
       
-      <div className="dial-scale">
-        {Array.from({ length: 11 }, (_, i) => (
-          <div
-            key={i}
-            className="scale-mark"
-            style={{ transform: `rotate(${(i * 18) - 90}deg)` }}
-          >
-            <div className="scale-number">{i * 10}</div>
-          </div>
-        ))}
-      </div>
 
-      <div
-        className={`dial-pointer ${disabled ? 'disabled' : ''} ${isDragging ? 'dragging' : ''}`}
-        style={{ transform: `rotate(${getRotation(position)}deg)` }}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-      />
+      {!hidePointer && (
+        <div
+          className={`dial-pointer ${disabled ? 'disabled' : ''} ${isDragging ? 'dragging' : ''}`}
+          style={{ transform: `rotate(${getRotation(animatingToPosition)}deg)` }}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+        />
+      )}
       
       <div className="dial-center" />
       
-      {!disabled && (
+      {!disabled && !hidePointer && (
         <div className="dial-instructions">
           Click and drag the red dial to set your guess
         </div>

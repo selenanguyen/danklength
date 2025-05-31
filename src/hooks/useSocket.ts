@@ -25,6 +25,9 @@ export interface MultiplayerState {
   players: Player[];
   currentPlayerId: string | null;
   errors: string[];
+  gameStarted: boolean;
+  gameConfig: GameConfig | null;
+  syncedGameState: any | null;
 }
 
 const initialState: MultiplayerState = {
@@ -34,6 +37,9 @@ const initialState: MultiplayerState = {
   players: [],
   currentPlayerId: null,
   errors: [],
+  gameStarted: false,
+  gameConfig: null,
+  syncedGameState: null,
 };
 
 export const useSocket = () => {
@@ -125,6 +131,32 @@ export const useSocket = () => {
       }));
     });
 
+    // Game started event - notify when host starts the game
+    socket.on('game-started', (data) => {
+      console.log('Game started event received:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        gameStarted: true,
+        gameConfig: data.gameConfig,
+        syncedGameState: data.gameState,
+      }));
+    });
+
+    // Game state synchronization events
+    socket.on('game-state-updated', (data) => {
+      console.log('Game state updated:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        syncedGameState: data.gameState,
+      }));
+    });
+
+    // Real-time dial position updates
+    socket.on('dial-updated', (data) => {
+      console.log('Dial position updated:', data);
+      // This will be handled by the app component
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -143,11 +175,18 @@ export const useSocket = () => {
   };
 
   const startGame = (gameConfig: GameConfig) => {
+    console.log('startGame called with:', gameConfig);
+    console.log('Socket connected:', !!socketRef.current);
+    console.log('Game code:', multiplayerState.gameCode);
+    
     if (socketRef.current && multiplayerState.gameCode) {
+      console.log('Emitting start-game event');
       socketRef.current.emit('start-game', {
         gameCode: multiplayerState.gameCode,
         gameConfig,
       });
+    } else {
+      console.log('Cannot start game - missing socket or game code');
     }
   };
 

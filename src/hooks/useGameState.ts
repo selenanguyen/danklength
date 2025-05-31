@@ -153,7 +153,7 @@ export const useGameState = () => {
     }
   }, [gameState, calculateScore]);
 
-  const initializeAndStartGame = useCallback((config: GameConfig) => {
+  const initializeAndStartGame = useCallback((config: GameConfig, syncedGameState?: any) => {
     const players: Player[] = config.players.map((name, index) => ({
       id: `player-${index}`,
       name,
@@ -174,13 +174,24 @@ export const useGameState = () => {
       totalRounds = customPrompts.length * promptsPerPlayer;
     }
 
-    // Start the first round immediately
-    const card = config.mode === 'custom' && customPrompts.length > 0 
-      ? customPrompts[0] 
-      : getRandomConcept();
-    
-    const target = generateTarget();
-    const targetWidth = generateTargetWidth();
+    // Use synced game state if provided (multiplayer), otherwise generate locally (local play)
+    let card: SpectrumConcept;
+    let target: number;
+    let targetWidth: number;
+
+    if (syncedGameState) {
+      // Use synchronized values from server
+      card = syncedGameState.currentCard;
+      target = syncedGameState.targetPosition;
+      targetWidth = syncedGameState.targetWidth;
+    } else {
+      // Generate locally for single-player mode
+      card = config.mode === 'custom' && customPrompts.length > 0 
+        ? customPrompts[0] 
+        : getRandomConcept();
+      target = generateTarget();
+      targetWidth = generateTargetWidth();
+    }
 
     setGameState(prev => ({
       ...prev,
@@ -212,6 +223,13 @@ export const useGameState = () => {
     }));
   }, []);
 
+  const syncGameState = useCallback((newGameState: Partial<GameState>) => {
+    setGameState(prev => ({
+      ...prev,
+      ...newGameState,
+    }));
+  }, []);
+
   return {
     gameState,
     initializeGame,
@@ -223,5 +241,6 @@ export const useGameState = () => {
     resetGame,
     updateDialPosition,
     calculateScore,
+    syncGameState,
   };
 };

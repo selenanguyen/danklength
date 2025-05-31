@@ -3,19 +3,64 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 
+// Spectrum concepts data
+const spectrumConcepts = [
+  { id: '1', leftConcept: 'Hot', rightConcept: 'Cold' },
+  { id: '2', leftConcept: 'Underrated', rightConcept: 'Overrated' },
+  { id: '3', leftConcept: 'Scary', rightConcept: 'Not Scary' },
+  { id: '4', leftConcept: 'Round', rightConcept: 'Pointy' },
+  { id: '5', leftConcept: 'Smells Bad', rightConcept: 'Smells Good' },
+  { id: '6', leftConcept: 'Loud', rightConcept: 'Quiet' },
+  { id: '7', leftConcept: 'Expensive', rightConcept: 'Cheap' },
+  { id: '8', leftConcept: 'Fast', rightConcept: 'Slow' },
+  { id: '9', leftConcept: 'Big', rightConcept: 'Small' },
+  { id: '10', leftConcept: 'Soft', rightConcept: 'Hard' },
+  { id: '11', leftConcept: 'Masculine', rightConcept: 'Feminine' },
+  { id: '12', leftConcept: 'Young', rightConcept: 'Old' },
+  { id: '13', leftConcept: 'Wet', rightConcept: 'Dry' },
+  { id: '14', leftConcept: 'Heavy', rightConcept: 'Light' },
+  { id: '15', leftConcept: 'Boring', rightConcept: 'Exciting' },
+  { id: '16', leftConcept: 'Dark', rightConcept: 'Bright' },
+  { id: '17', leftConcept: 'Rough', rightConcept: 'Smooth' },
+  { id: '18', leftConcept: 'Unhealthy', rightConcept: 'Healthy' },
+  { id: '19', leftConcept: 'Fantasy', rightConcept: 'Sci-Fi' },
+  { id: '20', leftConcept: 'Risky', rightConcept: 'Safe' },
+];
+
+// Function to get a random spectrum concept
+function getRandomConcept() {
+  const randomIndex = Math.floor(Math.random() * spectrumConcepts.length);
+  return spectrumConcepts[randomIndex];
+}
+
+// Function to get concept from custom prompts or default concepts
+function getConceptForGame(gameConfig, currentPromptIndex = 0) {
+  if (gameConfig.mode === 'custom' && gameConfig.customPrompts && gameConfig.customPrompts.length > 0) {
+    // Use custom prompts if available
+    const promptIndex = currentPromptIndex % gameConfig.customPrompts.length;
+    return gameConfig.customPrompts[promptIndex];
+  } else {
+    // Use default random concept
+    return getRandomConcept();
+  }
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ["https://wavelength-game.netlify.app", "https://wavelength-game-selena.netlify.app"]
+      ? ["https://wavelength-game.netlify.app", "https://wavelength-game-selena.netlify.app", "https://danklength.netlify.app"]
       : ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
-app.use(cors());
+app.use(cors({
+  origin: true, // Allow all origins for development
+  credentials: true
+}));
 app.use(express.json());
 
 // Health check endpoint
@@ -34,6 +79,16 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     activeRooms: gameRooms.size
   });
+});
+
+// Get all spectrum concepts
+app.get('/api/spectrum-concepts', (req, res) => {
+  res.json(spectrumConcepts);
+});
+
+// Get a random spectrum concept
+app.get('/api/random-concept', (req, res) => {
+  res.json(getRandomConcept());
 });
 
 // Game rooms storage
@@ -161,10 +216,21 @@ io.on('connection', (socket) => {
     }
 
     room.isGameStarted = true;
+    
+    // Generate initial game state with a spectrum concept
+    const currentCard = getConceptForGame(gameConfig, 0);
     room.gameState = {
       ...gameConfig,
       currentRound: 0,
       phase: 'psychic',
+      currentCard: currentCard,
+      targetPosition: Math.random() * 100, // Random target position (0-100)
+      targetWidth: 20, // Default target width
+      dialPosition: 50, // Initial dial position at center
+      psychicClue: '',
+      totalScore: 0,
+      roundScores: [],
+      currentPromptIndex: 0 // Track current prompt index for custom games
     };
 
     io.to(room.code).emit('game-started', {
@@ -172,7 +238,7 @@ io.on('connection', (socket) => {
       gameState: room.gameState,
     });
 
-    console.log(`Game started: ${room.code}`);
+    console.log(`Game started: ${room.code} with concept: ${currentCard.leftConcept} - ${currentCard.rightConcept}`);
   });
 
   // Update game state
@@ -215,6 +281,36 @@ io.on('connection', (socket) => {
       action,
       data: data,
     });
+  });
+
+  // Generate new spectrum concept for next round
+  socket.on('next-round', (data) => {
+    const { gameCode } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || !room.gameState) return;
+
+    // Increment prompt index and get next concept
+    const nextPromptIndex = (room.gameState.currentPromptIndex || 0) + 1;
+    const newCard = getConceptForGame(room.gameState, nextPromptIndex);
+    const newTargetPosition = Math.random() * 100;
+    
+    // Update room game state
+    room.gameState.currentCard = newCard;
+    room.gameState.targetPosition = newTargetPosition;
+    room.gameState.dialPosition = 50; // Reset dial to center
+    room.gameState.psychicClue = ''; // Reset clue
+    room.gameState.currentRound += 1;
+    room.gameState.currentPromptIndex = nextPromptIndex;
+
+    // Broadcast the new round data to all players
+    io.to(room.code).emit('new-round-data', {
+      currentCard: newCard,
+      targetPosition: newTargetPosition,
+      currentRound: room.gameState.currentRound
+    });
+
+    console.log(`New round started for game ${room.code}: ${newCard.leftConcept} - ${newCard.rightConcept}`);
   });
 
   // Handle disconnection
