@@ -27,31 +27,227 @@
     <div class="dog dog2"></div>
     <div class="poop poop1"></div>
     <div class="poop poop2"></div>
+    <div class="poop-counter">0 poops collected</div>
     
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- Poop cleaning functionality and random positioning -->
+    <!-- Dog animation and poop system -->
     <script>
-      // Add click handlers for poop cleaning when DOM loads
       document.addEventListener('DOMContentLoaded', function() {
-        // Randomize poop locations on page load
-        function randomizePoopLocations() {
-          // Generate random positions between 20% and 80% to keep them visible
-          const poop1Left = Math.floor(Math.random() * 40 + 20) + '%'; // 20-60%
-          const poop2Left = Math.floor(Math.random() * 40 + 40) + '%'; // 40-80%
+        let poopCount = 0;
+        
+        // Dog animation system with waypoint-based movement
+        class DogAnimator {
+          constructor() {
+            this.dog1 = document.querySelector('.dog1');
+            this.dog2 = document.querySelector('.dog2');
+            this.poop1 = document.querySelector('.poop1');
+            this.poop2 = document.querySelector('.poop2');
+            
+            // Get viewport width for speed calculation
+            const viewportWidth = window.innerWidth;
+            const baseSpeed = 0.8; // base speed in pixels per frame
+            
+            // Waypoint-based movement system
+            this.dog1 = {
+              element: this.dog1,
+              currentPos: { x: -10, y: 20 },
+              targetPos: null,
+              homePos: { x: -10, y: 20 },
+              facingRight: false,
+              speed: (baseSpeed / viewportWidth) * 100, // convert to percentage per frame
+              state: 'walking', // 'walking', 'pooping', 'returning'
+              poopTimer: 0,
+              poopInterval: 800, // frames between poop cycles (consistent timing)
+              poopDuration: 60 // frames to poop
+            };
+            
+            this.dog2 = {
+              element: this.dog2,
+              currentPos: { x: 110, y: 40 },
+              targetPos: null,
+              homePos: { x: 110, y: 40 },
+              facingRight: true,
+              speed: (baseSpeed * 0.8 / viewportWidth) * 100, // slightly different speed for variety
+              state: 'walking',
+              poopTimer: 400, // offset from dog1
+              poopInterval: 900,
+              poopDuration: 60
+            };
+            
+            // Poop persistence tracking
+            this.poop1Timer = null;
+            this.poop2Timer = null;
+            this.poop1Visible = false;
+            this.poop2Visible = false;
+            
+            this.generateNewTarget(this.dog1);
+            this.generateNewTarget(this.dog2);
+            
+            this.startAnimations();
+          }
           
-          // Set CSS custom properties for poop positions
-          document.documentElement.style.setProperty('--poop1-left', poop1Left);
-          document.documentElement.style.setProperty('--poop2-left', poop2Left);
+          generateRandomPoopSpot() {
+            return {
+              x: Math.random() * 90 + 5,   // 5% to 95% (include edges)
+              y: Math.random() * 140 + 10  // 10px to 150px (include bottom edge)
+            };
+          }
           
-          console.log('Randomized poop locations:', poop1Left, poop2Left);
+          generateNewTarget(dog) {
+            // Generate random poop location anywhere on grass
+            dog.targetPos = this.generateRandomPoopSpot();
+          }
+          
+          distance(pos1, pos2) {
+            const dx = pos2.x - pos1.x;
+            const dy = pos2.y - pos1.y;
+            return Math.sqrt(dx * dx + dy * dy);
+          }
+          
+          moveTowards(dog, target) {
+            const dx = target.x - dog.currentPos.x;
+            const dy = target.y - dog.currentPos.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist <= dog.speed) {
+              // Reached target
+              dog.currentPos.x = target.x;
+              dog.currentPos.y = target.y;
+              return true;
+            } else {
+              // Move towards target at consistent speed
+              dog.currentPos.x += (dx / dist) * dog.speed;
+              dog.currentPos.y += (dy / dist) * dog.speed;
+              
+              // Update facing direction (flip because dog image faces right by default)
+              dog.facingRight = dx < 0;
+              return false;
+            }
+          }
+          
+          updateDogDisplay(dog) {
+            if (dog.element) {
+              dog.element.style.left = dog.currentPos.x + '%';
+              dog.element.style.bottom = dog.currentPos.y + 'px';
+              dog.element.style.transform = `scaleX(${dog.facingRight ? 1 : -1})`;
+            }
+          }
+          
+          createPoop(dogData, poopElement, poopId) {
+            if (poopElement && !this[`poop${poopId}Visible`] && !poopElement.classList.contains('cleaning')) {
+              this[`poop${poopId}Visible`] = true;
+              
+              // Position poop with improved offsets (+1 right, +0.5 up from current)
+              const offsetX = dogData.facingRight ? 4 : -2; // adjusted: right dog +1, left dog +1
+              const offsetY = 1; // +0.5 up adjustment
+              // Allow poop at edges - only prevent going completely off-screen
+              const poopX = Math.max(-5, Math.min(105, dogData.currentPos.x + offsetX));
+              const poopY = Math.max(5, Math.min(200, dogData.currentPos.y + offsetY));
+              
+              poopElement.style.left = poopX + '%';
+              poopElement.style.bottom = poopY + 'px';
+              poopElement.style.opacity = '0.8';
+              poopElement.style.pointerEvents = 'auto'; // Ensure clickable
+              poopElement.style.display = 'block'; // Ensure visible
+              
+              console.log(`Poop ${poopId} created at ${dogData.currentPos.x + offsetX}%, ${dogData.currentPos.y + 0.5}px`);
+              
+              // Clear any existing timer
+              if (this[`poop${poopId}Timer`]) {
+                clearTimeout(this[`poop${poopId}Timer`]);
+              }
+              
+              // Set timer to fade out after 20 seconds
+              this[`poop${poopId}Timer`] = setTimeout(() => {
+                if (poopElement && !poopElement.classList.contains('cleaning')) {
+                  poopElement.style.transition = 'opacity 3s ease-out';
+                  poopElement.style.opacity = '0';
+                  setTimeout(() => {
+                    this[`poop${poopId}Visible`] = false;
+                    if (poopElement) poopElement.style.transition = '';
+                  }, 3000);
+                }
+              }, 20000);
+            }
+          }
+          
+          updateDog(dog, poopElement, poopId) {
+            // Update poop timer
+            dog.poopTimer++;
+            
+            // Dog state machine
+            switch (dog.state) {
+              case 'walking':
+                // Move towards poop target
+                const reachedTarget = this.moveTowards(dog, dog.targetPos);
+                
+                if (reachedTarget) {
+                  // Start pooping
+                  dog.state = 'pooping';
+                  dog.poopTimer = 0;
+                }
+                break;
+                
+              case 'pooping':
+                // Stay still and poop
+                if (dog.poopTimer === 1) {
+                  // Create poop at current location
+                  this.createPoop(dog, poopElement, poopId);
+                }
+                
+                if (dog.poopTimer >= dog.poopDuration) {
+                  // Done pooping, start returning home
+                  dog.state = 'returning';
+                  dog.targetPos = { ...dog.homePos };
+                }
+                break;
+                
+              case 'returning':
+                // Move back to home position
+                const reachedHome = this.moveTowards(dog, dog.targetPos);
+                
+                if (reachedHome) {
+                  // Reset timer and generate new target
+                  dog.poopTimer = 0;
+                  dog.state = 'walking';
+                  this.generateNewTarget(dog);
+                }
+                break;
+            }
+            
+            // Update visual position
+            this.updateDogDisplay(dog);
+          }
+          
+          animate() {
+            // Update both dogs independently
+            this.updateDog(this.dog1, this.poop1, 1);
+            this.updateDog(this.dog2, this.poop2, 2);
+            
+            requestAnimationFrame(() => this.animate());
+          }
+          
+          startAnimations() {
+            this.animate();
+          }
+        }
+        
+        // Poop cleaning system
+        function updatePoopCounter() {
+          const counter = document.querySelector('.poop-counter');
+          if (counter) {
+            counter.textContent = `${poopCount} poops collected`;
+            if (poopCount > 0) {
+              counter.style.display = 'block';
+            }
+          }
         }
         
         function addPoopCleaners() {
           const poops = document.querySelectorAll('.poop');
           poops.forEach(poop => {
-            // Remove existing listeners to avoid duplicates
             poop.removeEventListener('click', handlePoopClick);
             poop.addEventListener('click', handlePoopClick);
           });
@@ -59,48 +255,52 @@
         
         function handlePoopClick(event) {
           const poop = event.target;
-          if (poop.classList.contains('cleaning')) return; // Already being cleaned
+          console.log('Poop clicked:', poop.className, 'opacity:', poop.style.opacity);
           
-          // Start cleaning animation
+          if (poop.classList.contains('cleaning') || poop.style.opacity === '0' || poop.style.opacity === '') return;
+          
+          poopCount++;
+          updatePoopCounter();
+          
+          // Determine which poop this is and mark it as cleaned
+          const poopId = poop.classList.contains('poop1') ? 1 : 2;
+          const animator = window.dogAnimator;
+          
+          console.log(`Cleaning poop ${poopId}`);
+          
           poop.classList.add('cleaning');
           
-          // Create broom element
+          // Clear the timer and mark as not visible
+          if (animator && animator[`poop${poopId}Timer`]) {
+            clearTimeout(animator[`poop${poopId}Timer`]);
+            animator[`poop${poopId}Timer`] = null;
+          }
+          if (animator) {
+            animator[`poop${poopId}Visible`] = false;
+          }
+          
           const broom = document.createElement('div');
           broom.className = 'broom';
-          
-          // Get the actual computed position of the poop
-          const poopRect = poop.getBoundingClientRect();
-          const bodyRect = document.body.getBoundingClientRect();
-          const poopLeftPercent = ((poopRect.left - bodyRect.left) / bodyRect.width * 100) + '%';
-          
-          broom.style.left = poopLeftPercent;
+          broom.style.left = poop.style.left || getComputedStyle(poop).left;
+          broom.style.bottom = poop.style.bottom || getComputedStyle(poop).bottom;
           document.body.appendChild(broom);
           
-          // Remove both elements after animation
           setTimeout(() => {
             if (broom.parentNode) {
               broom.parentNode.removeChild(broom);
             }
             if (poop.parentNode) {
               poop.classList.remove('cleaning');
-              // Reset poop animation to start fresh cycle
-              poop.style.animation = 'none';
-              setTimeout(() => {
-                poop.style.animation = '';
-              }, 10);
+              poop.style.opacity = '0';
+              poop.style.transition = '';
             }
           }, 2000);
         }
         
-        // Initialize random locations and poop cleaners
-        randomizePoopLocations();
+        // Initialize system
+        window.dogAnimator = new DogAnimator(); // Store global reference
         addPoopCleaners();
-        
-        // Re-add event listeners periodically in case DOM updates
         setInterval(addPoopCleaners, 5000);
-        
-        // Randomize locations every few minutes to keep it fresh
-        setInterval(randomizePoopLocations, 120000); // Every 2 minutes
       });
     </script>
   </body>

@@ -101,7 +101,7 @@ body::before {
   height: 20px;
   background: var(--tama-pink);
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  z-index: -1;
+  z-index: -3;
   animation: sway 3s ease-in-out infinite;
 }
 
@@ -131,259 +131,59 @@ body::before {
   50% { transform: rotate(5deg); }
 }
 
-/* Cute dogs using animated GIF */
+/* JavaScript-controlled dog animations */
 .dog {
   position: fixed;
   width: 60px;
   height: 60px;
-  z-index: -1;
+  z-index: 1;
   transform-origin: center bottom;
   background-image: url('https://media3.giphy.com/media/a0tbZW2IxlUEmFcU02/giphy.gif');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center bottom;
+  transition: none;
 }
 
-.dog1 {
-  animation: frolic1 20s ease-in-out infinite;
+.dog1, .dog2 {
+  /* No CSS animations - controlled by JavaScript */
 }
 
-.dog2 {
-  animation: frolic2 25s ease-in-out infinite;
-  animation-delay: -10s;
-}
-
-@keyframes frolic1 {
-  0% { 
-    left: 10%; 
-    bottom: 60px; 
-    transform: scaleX(-1); 
-  }
-  15% { 
-    left: 30%; 
-    bottom: 120px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog approaches poop spot slowly */
-  25% { 
-    left: 40%; 
-    bottom: 95px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog stops to poop for 10% of animation (30-35%) */
-  30% { 
-    left: var(--poop1-left, 45%); 
-    bottom: 85px; 
-    transform: scaleX(-1); 
-  }
-  35% { 
-    left: var(--poop1-left, 45%); 
-    bottom: 85px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog leaves poop spot slowly */
-  40% { 
-    left: 50%; 
-    bottom: 95px; 
-    transform: scaleX(-1); 
-  }
-  55% { 
-    left: 75%; 
-    bottom: 140px; 
-    transform: scaleX(-1); 
-  }
-  65% { 
-    left: 85%; 
-    bottom: 80px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog turns around at the edge */
-  70% { 
-    left: 85%; 
-    bottom: 80px; 
-    transform: scaleX(1); 
-  }
-  85% { 
-    left: 50%; 
-    bottom: 160px; 
-    transform: scaleX(1); 
-  }
-  95% { 
-    left: 20%; 
-    bottom: 100px; 
-    transform: scaleX(1); 
-  }
-  /* Dog turns around at the other edge */
-  98% { 
-    left: 10%; 
-    bottom: 60px; 
-    transform: scaleX(-1); 
-  }
-  100% { 
-    left: 10%; 
-    bottom: 60px; 
-    transform: scaleX(-1); 
-  }
-}
-
-@keyframes frolic2 {
-  0% { 
-    left: 75%; 
-    bottom: 130px; 
-    transform: scaleX(1); 
-  }
-  12% { 
-    left: 60%; 
-    bottom: 180px; 
-    transform: scaleX(1); 
-  }
-  25% { 
-    left: 40%; 
-    bottom: 120px; 
-    transform: scaleX(1); 
-  }
-  35% { 
-    left: 20%; 
-    bottom: 60px; 
-    transform: scaleX(1); 
-  }
-  /* Dog turns around at left edge */
-  40% { 
-    left: 15%; 
-    bottom: 60px; 
-    transform: scaleX(-1); 
-  }
-  50% { 
-    left: 35%; 
-    bottom: 140px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog approaches poop spot slowly */
-  60% { 
-    left: 55%; 
-    bottom: 95px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog stops to poop for 10% of animation (65-70%) */
-  65% { 
-    left: var(--poop2-left, 65%); 
-    bottom: 85px; 
-    transform: scaleX(-1); 
-  }
-  70% { 
-    left: var(--poop2-left, 65%); 
-    bottom: 85px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog leaves poop spot slowly */
-  75% { 
-    left: 70%; 
-    bottom: 95px; 
-    transform: scaleX(-1); 
-  }
-  85% { 
-    left: 85%; 
-    bottom: 120px; 
-    transform: scaleX(-1); 
-  }
-  92% { 
-    left: 90%; 
-    bottom: 90px; 
-    transform: scaleX(-1); 
-  }
-  /* Dog turns around at right edge */
-  95% { 
-    left: 90%; 
-    bottom: 90px; 
-    transform: scaleX(1); 
-  }
-  100% { 
-    left: 75%; 
-    bottom: 130px; 
-    transform: scaleX(1); 
-  }
-}
-
-/* Dog poop (appears occasionally) */
+/* JavaScript-controlled poop system */
 .poop {
   position: fixed;
-  bottom: 85px;
-  width: 20px;
-  height: 16px;
+  width: 16px;
+  height: 13px;
   background: #8B4513;
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  z-index: 5;
+  z-index: 0;
   opacity: 0;
-  animation: poop-appear 60s ease-in-out infinite;
   cursor: pointer;
   transition: transform 0.2s ease;
   pointer-events: auto;
+  /* Larger click area for edge accessibility */
+  padding: 8px;
+  margin: -8px;
 }
 
 .poop:hover {
   transform: scale(1.3);
-  z-index: 6;
 }
 
 .poop::before {
   content: '';
   position: absolute;
-  top: -3px;
+  top: -2px;
   left: 1px;
-  width: 6px;
-  height: 4px;
+  width: 5px;
+  height: 3px;
   background: #8B4513;
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
 }
 
-.poop1 {
-  left: var(--poop1-left, 45%);
-  animation: poop1-appear 20s ease-in-out infinite;
-  animation-delay: 0s;
-}
-
-.poop2 {
-  left: var(--poop2-left, 65%);
-  animation: poop2-appear 25s ease-in-out infinite;
-  animation-delay: -10s;
-}
-
-/* Poop1 appears when dog1 is pooping (30-35% of 20s cycle) */
-@keyframes poop1-appear {
-  0%, 29% { 
-    opacity: 0; 
-    transform: scale(0); 
-    pointer-events: none; 
-  }
-  30%, 80% { 
-    opacity: 0.8; 
-    transform: scale(1); 
-    pointer-events: auto; 
-  }
-  85%, 100% { 
-    opacity: 0; 
-    transform: scale(0.8); 
-    pointer-events: none; 
-  }
-}
-
-/* Poop2 appears when dog2 is pooping (65-70% of 25s cycle) */
-@keyframes poop2-appear {
-  0%, 64% { 
-    opacity: 0; 
-    transform: scale(0); 
-    pointer-events: none; 
-  }
-  65%, 80% { 
-    opacity: 0.8; 
-    transform: scale(1); 
-    pointer-events: auto; 
-  }
-  85%, 100% { 
-    opacity: 0; 
-    transform: scale(0.8); 
-    pointer-events: none; 
-  }
+/* Initial poop positions - will be overridden by JavaScript */
+.poop1, .poop2 {
+  /* No CSS animations - controlled by JavaScript */
 }
 
 /* Poop cleaning animation */
@@ -423,7 +223,6 @@ body::before {
 /* Broom cleaning animation */
 .broom {
   position: fixed;
-  bottom: 75px;
   width: 50px;
   height: 50px;
   background-image: url('https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExODR1cXhwdWljcXlrZmF6ZG8zc244cmI2ZTFmYjMxb2tuc2oxZXpzMSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l0u897CIX2Z5Qpnxcr/giphy.gif');
@@ -480,8 +279,9 @@ body::before {
   min-height: 100vh;
   padding: 20px;
   position: relative;
-  z-index: 1;
+  z-index: 10;
   width: 100%;
+  pointer-events: none;
 }
 
 h1 {
@@ -528,6 +328,7 @@ button {
   box-shadow: 0 4px 8px var(--tama-shadow);
   text-transform: uppercase;
   letter-spacing: 1px;
+  pointer-events: auto;
 }
 
 button:hover {
@@ -643,8 +444,29 @@ button:focus-visible {
 /* Make game containers more bouncy */
 .game-container > * {
   transition: transform 0.3s ease;
+  pointer-events: auto;
 }
 
 .game-container > *:hover {
   transform: translateY(-2px);
+}
+
+/* Ensure all interactive elements can be clicked */
+input, select, textarea, a, [role="button"] {
+  pointer-events: auto !important;
+}
+
+/* Poop counter in bottom right */
+.poop-counter {
+  position: fixed;
+  bottom: 10px;
+  right: 15px;
+  font-size: 11px;
+  color: #FFD700;
+  opacity: 0.7;
+  font-weight: 500;
+  z-index: 2;
+  pointer-events: none;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  display: none;
 }
