@@ -49,11 +49,10 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? ["https://wavelength-game.netlify.app", "https://wavelength-game-selena.netlify.app", "https://danklength.netlify.app"]
-      : ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
+    origin: true, // Allow all origins for debugging
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ["ngrok-skip-browser-warning", "bypass-tunnel-reminder"]
   }
 });
 

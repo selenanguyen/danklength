@@ -47,6 +47,8 @@ export const useSocket = () => {
   const [multiplayerState, setMultiplayerState] = useState<MultiplayerState>(initialState);
 
   useEffect(() => {
+    console.log('Connecting to server:', config.serverUrl);
+    
     // Connect to server with comprehensive ngrok bypass configuration
     socketRef.current = io(config.serverUrl, {
       transportOptions: {
@@ -66,9 +68,9 @@ export const useSocket = () => {
       // Additional options for better connection stability and ngrok compatibility
       forceNew: true,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      timeout: 30000,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+      timeout: 10000,
       // Force polling first for better ngrok compatibility
       transports: ['polling'],
       // Additional query parameters to bypass ngrok
@@ -80,7 +82,7 @@ export const useSocket = () => {
     const socket = socketRef.current;
 
     socket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('✅ Connected to server successfully');
       setMultiplayerState(prev => ({
         ...prev,
         isConnected: true,
@@ -88,11 +90,31 @@ export const useSocket = () => {
       }));
     });
 
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Disconnected from server:', reason);
       setMultiplayerState(prev => ({
         ...prev,
         isConnected: false,
+      }));
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error);
+      setMultiplayerState(prev => ({
+        ...prev,
+        errors: [...prev.errors, `Connection failed: ${error.message}`],
+      }));
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`🔄 Reconnection attempt ${attemptNumber}`);
+    });
+
+    socket.on('reconnect_failed', () => {
+      console.error('❌ All reconnection attempts failed');
+      setMultiplayerState(prev => ({
+        ...prev,
+        errors: [...prev.errors, 'Unable to connect to server'],
       }));
     });
 

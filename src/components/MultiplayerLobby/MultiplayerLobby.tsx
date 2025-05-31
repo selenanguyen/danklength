@@ -94,6 +94,18 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
       <div className="multiplayer-lobby">
         <div className="connection-status">
           <h2>Connecting to server...</h2>
+          {multiplayerState.errors.length > 0 && (
+            <div className="error-messages">
+              {multiplayerState.errors.map((error, index) => (
+                <div key={index} className="error-message">
+                  {error}
+                </div>
+              ))}
+              <button onClick={clearErrors} className="clear-errors-button">
+                Clear Errors
+              </button>
+            </div>
+          )}
           <div className="loading-spinner"></div>
           <button onClick={onBackToLocal} className="back-button">
             Back to Local Play

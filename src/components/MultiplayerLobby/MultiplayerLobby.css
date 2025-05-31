@@ -34,6 +34,36 @@
   100% { transform: rotate(360deg); }
 }
 
+.error-messages {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.error-message {
+  color: #721c24;
+  margin: 5px 0;
+  font-weight: 500;
+}
+
+.clear-errors-button {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.clear-errors-button:hover {
+  background: #c82333;
+}
+
 .lobby-header {
   text-align: center;
   margin-bottom: 30px;
