@@ -29,8 +29,9 @@ A digital recreation of the popular board game "Wavelength" - a social guessing 
 ### Prerequisites
 - Node.js (version 14 or higher)
 - npm or yarn
+- ngrok account (free) for hosting games
 
-### Installation & Running
+### Installation
 
 1. **Navigate to the project directory:**
    ```bash
@@ -42,25 +43,73 @@ A digital recreation of the popular board game "Wavelength" - a social guessing 
    npm install
    ```
 
-3. **For Local Play Only:**
-   ```bash
-   npm run dev
-   ```
-   Then open: http://localhost:5173/
+### 🎮 Hosting Games for Friends
 
-4. **For Remote Multiplayer:**
-   
-   **Terminal 1 - Start the server:**
-   ```bash
-   npm run dev:server
-   ```
-   
-   **Terminal 2 - Start the client:**
-   ```bash
-   npm run dev
-   ```
-   
-   Then open: http://localhost:5173/
+**One-Command Server Setup** (Recommended):
+```bash
+./start-server.sh
+```
+
+This script automatically:
+- Starts your local game server
+- Creates an ngrok tunnel for remote access
+- Updates the website configuration
+- Builds and deploys the website
+- Provides you with all the URLs
+
+**What you'll see:**
+```
+🎉 Setup Complete!
+================================
+🌐 Website: https://danklength.netlify.app
+🔗 Ngrok URL: https://abc123.ngrok-free.app
+⏰ Deploy triggered at: 2025-05-31 18:30:25 UTC
+📡 Check deploy status: https://app.netlify.com/sites/danklength/deploys
+
+🎮 Your friends can now play at: https://danklength.netlify.app
+Press Ctrl+C to stop all services
+```
+
+**Share the website URL** with friends and start playing!
+
+### 🔧 Troubleshooting
+
+**If the script fails:**
+1. Make sure you have ngrok configured: `ngrok config add-authtoken YOUR_TOKEN`
+2. Check if ports 3001 or 4040 are already in use
+3. Ensure you have git configured and the repository is set up
+
+**If friends can't connect:**
+1. Check that ngrok is still running (script should show "Press Ctrl+C to stop")
+2. Verify the website deployed: Check the Netlify deploy status URL shown by the script
+3. Test your server: Run `curl YOUR_NGROK_URL/health` (URL from script output)
+4. Wait 1-2 minutes after deployment for changes to take effect
+
+**Each time you restart:**
+- The ngrok URL changes, so you need to run the script again
+- The website will automatically update with the new server URL
+
+### 🏠 Local Development Only
+
+**For Local Play Only:**
+```bash
+npm run dev
+```
+Then open: http://localhost:5173/
+
+**For Local Multiplayer Development:**
+
+Terminal 1 - Start the server:
+```bash
+npm run dev:server
+```
+
+Terminal 2 - Start the client:
+```bash
+npm run dev
+```
+
+Then open: http://localhost:5173/
 
 ### Game Modes
 

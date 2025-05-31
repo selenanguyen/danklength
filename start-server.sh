@@ -77,22 +77,27 @@ fi
 
 echo -e "${GREEN}✅ Website built successfully${NC}"
 
+# Get timestamp for deployment tracking
+DEPLOY_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+DEPLOY_TIME_UTC=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
 # Commit and push to git
 echo -e "${YELLOW}Committing changes to git...${NC}"
 git add .
 git commit -m "Update server URL to: $NGROK_URL" || echo "No changes to commit"
 git push || echo "Push failed - check git setup"
-echo -e "${GREEN}✅ Changes pushed to git${NC}"
+echo -e "${GREEN}✅ Changes pushed to git at $DEPLOY_TIME${NC}"
 
-# Deploy to Netlify (using drag & drop method)
+# Deploy to Netlify (git-based deployment)
 echo -e "${YELLOW}Deploying to Netlify...${NC}"
 if command -v netlify &> /dev/null; then
     netlify deploy --prod --dir=dist --site=danklength
-    echo -e "${GREEN}✅ Deployed to Netlify automatically${NC}"
+    echo -e "${GREEN}✅ Deployed to Netlify automatically via CLI${NC}"
 else
-    echo -e "${BLUE}📂 Netlify CLI not found. Please manually deploy the 'dist' folder to:${NC}"
-    echo -e "${BLUE}   https://app.netlify.com/sites/danklength/deploys${NC}"
-    echo -e "${BLUE}   Just drag the 'dist' folder to the deployment area.${NC}"
+    echo -e "${GREEN}✅ Netlify will auto-deploy from git push${NC}"
+    echo -e "${BLUE}📡 Check deployment status: https://app.netlify.com/sites/danklength/deploys${NC}"
+    echo -e "${BLUE}   Expected deploy time: $DEPLOY_TIME_UTC${NC}"
+    echo -e "${BLUE}   Deployment usually takes 1-2 minutes${NC}"
 fi
 
 # Success message
@@ -103,6 +108,9 @@ echo "🌐 Website: https://danklength.netlify.app"
 echo "🔗 Ngrok URL: $NGROK_URL"
 echo "🖥️  Local Server: http://localhost:3001"
 echo "📊 Ngrok Dashboard: http://localhost:4040"
+echo ""
+echo "⏰ Deploy triggered at: $DEPLOY_TIME_UTC"
+echo "📡 Check deploy status: https://app.netlify.com/sites/danklength/deploys"
 echo ""
 echo "🎮 Your friends can now play at: https://danklength.netlify.app"
 echo "   The website will connect to your local server!"
