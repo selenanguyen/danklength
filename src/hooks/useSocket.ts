@@ -47,8 +47,16 @@ export const useSocket = () => {
   const [multiplayerState, setMultiplayerState] = useState<MultiplayerState>(initialState);
 
   useEffect(() => {
-    // Connect to server
-    socketRef.current = io(config.serverUrl);
+    // Connect to server with ngrok bypass header
+    socketRef.current = io(config.serverUrl, {
+      transportOptions: {
+        polling: {
+          extraHeaders: {
+            'ngrok-skip-browser-warning': 'true'
+          }
+        }
+      }
+    });
 
     const socket = socketRef.current;
 
