@@ -129,6 +129,7 @@ function createGameRoom() {
   const room = {
     code: gameCode,
     host: null,
+    originalHostName: null, // Track the original game creator by name
     players: [],
     gameState: null,
     isGameStarted: false,
@@ -164,6 +165,7 @@ io.on('connection', (socket) => {
   socket.on('create-game', (data) => {
     const room = createGameRoom();
     room.host = socket.id;
+    room.originalHostName = data.playerName; // Set the original host name
     room.players.push({
       id: socket.id,
       name: data.playerName,
@@ -200,10 +202,72 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Check if player name already exists
-    const existingPlayer = room.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
+    // Check if player name already exists and is connected
+    const existingPlayer = room.players.find(p => p.name.toLowerCase() === playerName.toLowerCase() && p.isConnected);
     if (existingPlayer) {
       socket.emit('join-error', { message: 'Player name already taken' });
+      return;
+    }
+
+    // Check if this name belongs to a disconnected player
+    const disconnectedPlayer = room.players.find(p => p.name.toLowerCase() === playerName.toLowerCase() && !p.isConnected);
+    if (disconnectedPlayer) {
+      // Reconnect the disconnected player
+      disconnectedPlayer.id = socket.id;
+      disconnectedPlayer.isConnected = true;
+      
+      // Check if this is the original host reconnecting
+      if (room.originalHostName && room.originalHostName.toLowerCase() === playerName.toLowerCase()) {
+        // Original host is reconnecting - restore their host status
+        // First, remove host status from current host
+        const currentHost = room.players.find(p => p.isHost);
+        if (currentHost && currentHost !== disconnectedPlayer) {
+          currentHost.isHost = false;
+        }
+        
+        // Restore host status to original host
+        disconnectedPlayer.isHost = true;
+        room.host = socket.id;
+        
+        console.log(`Original host ${playerName} reconnected and regained host status in room ${room.code}`);
+      }
+      
+      socket.join(room.code);
+      
+      // Notify other players of reconnection
+      socket.to(room.code).emit('player-reconnected', {
+        playerId: socket.id,
+        playerName: playerName,
+        room: room,
+      });
+      
+      // If host status changed, notify about host transfer
+      if (disconnectedPlayer.isHost) {
+        io.to(room.code).emit('host-transferred', {
+          newHostId: socket.id,
+          newHostName: playerName,
+          room: room,
+        });
+      }
+      
+      socket.emit('game-joined', { room: room });
+      
+      // Send existing custom prompts to the reconnected player
+      if (room.customPrompts.length > 0) {
+        socket.emit('prompt-added', {
+          prompts: room.customPrompts,
+          addedBy: 'system',
+        });
+      }
+      
+      // Send current game mode to the reconnected player
+      if (room.gameMode) {
+        socket.emit('game-mode-updated', {
+          mode: room.gameMode,
+        });
+      }
+      
+      console.log(`${playerName} reconnected to game: ${room.code}`);
       return;
     }
 
@@ -257,15 +321,20 @@ io.on('connection', (socket) => {
     
     // Generate initial game state with a spectrum concept
     const currentCard = getConceptForGame(gameConfig, 0);
+    const connectedPlayers = room.players.filter(p => p.isConnected);
+    
     room.gameState = {
       ...gameConfig,
-      currentRound: 0,
-      phase: 'psychic',
+      players: connectedPlayers,
+      currentPsychicIndex: 0, // First player is psychic
       currentCard: currentCard,
       targetPosition: Math.random() * 100, // Random target position (0-100)
-      targetWidth: 20, // Default target width
+      targetWidth: Math.floor(Math.random() * 20) + 15, // Random width 15-35
       dialPosition: 50, // Initial dial position at center
+      gamePhase: 'psychic',
       psychicClue: '',
+      currentRound: 0,
+      totalRounds: 8, // Default 8 rounds
       totalScore: 0,
       roundScores: [],
       currentPromptIndex: 0 // Track current prompt index for custom games
@@ -390,6 +459,46 @@ io.on('connection', (socket) => {
     console.log(`Game mode updated for game ${room.code}: ${mode}`);
   });
 
+  // Handle intentional game leave
+  socket.on('leave-game', (data) => {
+    const { gameCode } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room) return;
+
+    const player = room.players.find(p => p.id === socket.id);
+    if (player) {
+      // Mark player as disconnected
+      player.isConnected = false;
+      
+      // Notify other players
+      socket.to(room.code).emit('player-disconnected', {
+        playerId: socket.id,
+        playerName: player.name,
+      });
+
+      // If host left, transfer host to next connected player
+      if (player.isHost && room.players.length > 1) {
+        const newHost = room.players.find(p => p.id !== socket.id && p.isConnected);
+        if (newHost) {
+          // Remove host status from disconnected player
+          player.isHost = false;
+          // Set new host
+          newHost.isHost = true;
+          room.host = newHost.id;
+          console.log(`Host transferred from ${player.name} to ${newHost.name} in room ${room.code}`);
+          io.to(room.code).emit('host-transferred', {
+            newHostId: newHost.id,
+            newHostName: newHost.name,
+            room: room,
+          });
+        }
+      }
+
+      console.log(`${player.name} left game: ${room.code}`);
+    }
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
@@ -410,6 +519,9 @@ io.on('connection', (socket) => {
         if (player.isHost && room.players.length > 1) {
           const newHost = room.players.find(p => p.id !== socket.id && p.isConnected);
           if (newHost) {
+            // Remove host status from disconnected player
+            player.isHost = false;
+            // Set new host
             newHost.isHost = true;
             room.host = newHost.id;
             console.log(`Host transferred from ${player.name} to ${newHost.name} in room ${room.code}`);

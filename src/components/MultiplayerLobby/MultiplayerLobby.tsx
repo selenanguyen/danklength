@@ -18,7 +18,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
     joinGame, 
     startGame,
     clearErrors,
-    resetMultiplayer,
+    leaveGame,
     submitCustomPrompt,
     updateGameMode,
   } = socketInstance;
@@ -136,7 +136,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
 
   const handleBack = () => {
     if (multiplayerState.gameCode) {
-      resetMultiplayer();
+      leaveGame();
     }
     if (mode !== 'menu') {
       setMode('menu');
@@ -220,7 +220,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
             {multiplayerState.players.map((player) => (
               <div key={player.id} className={`player-item ${!player.isConnected ? 'disconnected' : ''}`}>
                 <span className="player-name">{player.name}</span>
-                {player.isHost && <span className="host-badge">Host</span>}
+                {player.isConnected && player.isHost && <span className="host-badge">Host</span>}
                 {!player.isConnected && <span className="status-badge">Disconnected</span>}
               </div>
             ))}
@@ -231,7 +231,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
         <div className="game-mode-display">
           <h3>Game Mode</h3>
           <div className="mode-options">
-            <label className={`mode-option ${(multiplayerState.isHost ? gameMode === 'normal' : submittedPrompts.length === 0) ? 'selected' : ''} ${!multiplayerState.isHost ? 'read-only' : ''}`}>
+            <label className={`mode-option ${gameMode === 'normal' ? 'selected' : ''} ${!multiplayerState.isHost ? 'read-only' : ''}`}>
               {multiplayerState.isHost && (
                 <input
                   type="radio"
@@ -246,7 +246,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
               </div>
             </label>
             
-            <label className={`mode-option ${(multiplayerState.isHost ? gameMode === 'custom' : submittedPrompts.length > 0) ? 'selected' : ''} ${!multiplayerState.isHost ? 'read-only' : ''}`}>
+            <label className={`mode-option ${gameMode === 'custom' ? 'selected' : ''} ${!multiplayerState.isHost ? 'read-only' : ''}`}>
               {multiplayerState.isHost && (
                 <input
                   type="radio"
@@ -286,6 +286,11 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                       </div>
                     ))}
                   </div>
+                )}
+                
+                {/* Show message when no prompts yet */}
+                {submittedPrompts.length === 0 && (
+                  <p className="waiting-for-prompts">Add some custom spectrums below!</p>
                 )}
 
                 {/* Host-only prompt input section */}

@@ -165,6 +165,7 @@ export const useSocket = () => {
     });
 
     socket.on('player-disconnected', (data) => {
+      console.log('Player disconnected:', data);
       setMultiplayerState(prev => ({
         ...prev,
         players: prev.players.map(p => 
@@ -175,14 +176,22 @@ export const useSocket = () => {
       }));
     });
 
-    socket.on('host-transferred', (data) => {
+    socket.on('player-reconnected', (data) => {
+      console.log('Player reconnected:', data);
       setMultiplayerState(prev => ({
         ...prev,
-        isHost: prev.currentPlayerId === data.newHostId,
-        players: prev.players.map(p => ({
-          ...p,
-          isHost: p.id === data.newHostId,
-        })),
+        players: data.room.players,
+      }));
+    });
+
+    socket.on('host-transferred', (data) => {
+      console.log('Host transferred:', data);
+      console.log('Current player ID:', socketRef.current?.id);
+      console.log('New host ID:', data.newHostId);
+      setMultiplayerState(prev => ({
+        ...prev,
+        isHost: socketRef.current?.id === data.newHostId,
+        players: data.room.players, // Use the updated players list from server
       }));
     });
 
@@ -315,6 +324,15 @@ export const useSocket = () => {
     }));
   };
 
+  const leaveGame = () => {
+    if (socketRef.current && multiplayerState.gameCode) {
+      socketRef.current.emit('leave-game', {
+        gameCode: multiplayerState.gameCode,
+      });
+    }
+    resetMultiplayer();
+  };
+
   const submitCustomPrompt = (prompt: string) => {
     if (socketRef.current && multiplayerState.gameCode && prompt.trim()) {
       socketRef.current.emit('add-prompt', {
@@ -356,6 +374,7 @@ export const useSocket = () => {
     sendPlayerAction,
     clearErrors,
     resetMultiplayer,
+    leaveGame,
     submitCustomPrompt,
     updateGameMode,
     addEventListener,

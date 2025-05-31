@@ -180,10 +180,12 @@ export const useGameState = () => {
     let targetWidth: number;
 
     if (syncedGameState) {
-      // Use synchronized values from server
-      card = syncedGameState.currentCard;
-      target = syncedGameState.targetPosition;
-      targetWidth = syncedGameState.targetWidth;
+      // Use the complete synchronized game state from server
+      setGameState(prev => ({
+        ...prev,
+        ...syncedGameState,
+        customPrompts: config.mode === 'custom' ? customPrompts : undefined,
+      }));
     } else {
       // Generate locally for single-player mode
       card = config.mode === 'custom' && customPrompts.length > 0 
@@ -191,25 +193,25 @@ export const useGameState = () => {
         : getRandomConcept();
       target = generateTarget();
       targetWidth = generateTargetWidth();
-    }
 
-    setGameState(prev => ({
-      ...prev,
-      gameMode: config.mode,
-      players,
-      totalRounds,
-      customPrompts: config.mode === 'custom' ? customPrompts : undefined,
-      currentCard: card,
-      targetPosition: target,
-      targetWidth,
-      dialPosition: 50,
-      gamePhase: 'psychic',
-      psychicClue: '',
-      currentRound: 1, // Start with round 1
-      currentPsychicIndex: 0, // Start with first player
-      totalScore: 0,
-      roundScores: [],
-    }));
+      setGameState(prev => ({
+        ...prev,
+        gameMode: config.mode,
+        players,
+        totalRounds,
+        customPrompts: config.mode === 'custom' ? customPrompts : undefined,
+        currentCard: card,
+        targetPosition: target,
+        targetWidth,
+        dialPosition: 50,
+        gamePhase: 'psychic',
+        psychicClue: '',
+        currentRound: 1, // Start with round 1
+        currentPsychicIndex: 0, // Start with first player
+        totalScore: 0,
+        roundScores: [],
+      }));
+    }
   }, [generateTarget, generateTargetWidth]);
 
   const resetGame = useCallback(() => {
