@@ -49,17 +49,33 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: true, // Allow all origins for debugging
-    methods: ["GET", "POST"],
+    origin: function (origin, callback) {
+      // Allow all origins for debugging, including undefined (for same-origin requests)
+      callback(null, true);
+    },
+    methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["ngrok-skip-browser-warning", "bypass-tunnel-reminder"]
+    allowedHeaders: ["ngrok-skip-browser-warning", "bypass-tunnel-reminder", "content-type"],
+    optionsSuccessStatus: 200
   }
 });
 
-app.use(cors({
-  origin: true, // Allow all origins for development
-  credentials: true
-}));
+// More comprehensive CORS setup for Express
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, ngrok-skip-browser-warning, bypass-tunnel-reminder');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json());
 
 // Health check endpoint

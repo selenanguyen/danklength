@@ -49,33 +49,42 @@ export const useSocket = () => {
   useEffect(() => {
     console.log('Connecting to server:', config.serverUrl);
     
+    // For ngrok URLs, append bypass parameter directly to URL
+    let serverUrl = config.serverUrl;
+    if (serverUrl.includes('ngrok-free.app') || serverUrl.includes('ngrok.io')) {
+      // Add ngrok bypass parameter to the base URL
+      const separator = serverUrl.includes('?') ? '&' : '?';
+      serverUrl = `${serverUrl}${separator}ngrok-skip-browser-warning=true`;
+    }
+    
+    console.log('Modified server URL:', serverUrl);
+    
     // Connect to server with comprehensive ngrok bypass configuration
-    socketRef.current = io(config.serverUrl, {
+    socketRef.current = io(serverUrl, {
+      withCredentials: true,
       transportOptions: {
         polling: {
           extraHeaders: {
             'ngrok-skip-browser-warning': 'true',
             'bypass-tunnel-reminder': 'any'
-          }
-        },
-        websocket: {
-          extraHeaders: {
-            'ngrok-skip-browser-warning': 'true',
-            'bypass-tunnel-reminder': 'any'
-          }
+          },
+          withCredentials: true
         }
       },
       // Additional options for better connection stability and ngrok compatibility
       forceNew: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
-      timeout: 10000,
-      // Force polling first for better ngrok compatibility
+      reconnectionAttempts: 3,
+      reconnectionDelay: 3000,
+      timeout: 15000,
+      // Disable upgrade to avoid websocket issues with ngrok
+      upgrade: false,
+      // Force polling only for ngrok compatibility
       transports: ['polling'],
       // Additional query parameters to bypass ngrok
       query: {
-        'ngrok-skip-browser-warning': 'true'
+        'ngrok-skip-browser-warning': 'true',
+        'bypass-tunnel-reminder': 'true'
       }
     });
 
