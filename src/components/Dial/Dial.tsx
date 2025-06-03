@@ -17,6 +17,7 @@ interface DialProps {
 export const Dial: React.FC<DialProps> = ({
   position,
   targetPosition,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   targetWidth: _targetWidth, // Received but not used - we use fixed 25% for consistency
   showTarget = false,
   onPositionChange,

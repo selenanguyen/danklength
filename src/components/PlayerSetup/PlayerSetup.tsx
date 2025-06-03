@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import type { GameConfig } from '../../types';
+import type { GameConfig, SpectrumConcept } from '../../types';
+import { useUserPacks } from '../../hooks/useUserPacks';
+import { PackSelectionModal } from '../PackSelectionModal/PackSelectionModal';
 import './PlayerSetup.css';
 
 interface PlayerSetupProps {
@@ -12,6 +14,16 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
   const [addedPlayers, setAddedPlayers] = useState<string[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [customPrompts, setCustomPrompts] = useState<string[]>(['']);
+  const [showPackModal, setShowPackModal] = useState(false);
+
+  const {
+    userPacks,
+    username,
+    setCurrentUsername,
+    createPack,
+    addToExistingPack,
+    loadPackPrompts,
+  } = useUserPacks();
 
   const addPlayer = () => {
     if (newPlayerName.trim() !== '') {
@@ -44,6 +56,37 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
     const newPrompts = [...customPrompts];
     newPrompts[index] = prompt;
     setCustomPrompts(newPrompts);
+  };
+
+  const handleCreatePack = async (packName: string, selectedPrompts: SpectrumConcept[]) => {
+    await createPack(packName, selectedPrompts);
+  };
+
+  const handleAddToExistingPack = async (packId: string, selectedPrompts: SpectrumConcept[]) => {
+    await addToExistingPack(packId, selectedPrompts);
+  };
+
+  const handleLoadFromPack = (packId: string) => {
+    const packPrompts = loadPackPrompts(packId);
+    if (packPrompts) {
+      const promptStrings = packPrompts.map(p => `${p.leftConcept} vs ${p.rightConcept}`);
+      setCustomPrompts([...promptStrings, '']); // Add empty one for new additions
+      setGameMode('custom');
+    }
+  };
+
+  // Convert custom prompt strings to SpectrumConcept objects for pack saving
+  const getSpectrumConceptsFromPrompts = (): SpectrumConcept[] => {
+    return customPrompts
+      .filter(prompt => prompt.trim())
+      .map((prompt, index) => {
+        const parts = prompt.split(' vs ');
+        return {
+          id: `custom-${Date.now()}-${index}`,
+          leftConcept: parts[0]?.trim() || 'Left',
+          rightConcept: parts[1]?.trim() || 'Right',
+        };
+      });
   };
 
   const handleSubmit = () => {
@@ -156,7 +199,33 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
 
       {gameMode === 'custom' && (
         <div className="prompts-section">
-          <h3>Custom Prompts ({customPrompts.filter(p => p.trim()).length})</h3>
+          <div className="prompts-header">
+            <h3>Custom Prompts ({customPrompts.filter(p => p.trim()).length})</h3>
+            <div className="pack-actions">
+              {userPacks.length > 0 && (
+                <select 
+                  onChange={(e) => e.target.value && handleLoadFromPack(e.target.value)}
+                  value=""
+                  className="load-pack-select"
+                >
+                  <option value="">📦 Load from Pack</option>
+                  {userPacks.map(pack => (
+                    <option key={pack.id} value={pack.id}>
+                      {pack.name} ({pack.prompts.length} prompts)
+                    </option>
+                  ))}
+                </select>
+              )}
+              {customPrompts.some(p => p.trim()) && (
+                <button
+                  onClick={() => setShowPackModal(true)}
+                  className="save-pack-button"
+                >
+                  💾 Save to Pack
+                </button>
+              )}
+            </div>
+          </div>
           <p className="prompts-hint">
             Create spectrum concepts like "Hot vs Cold" or "Expensive vs Cheap"
           </p>
@@ -224,6 +293,17 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
           MAIN MENU
         </button>
       )}
+
+      <PackSelectionModal
+        isOpen={showPackModal}
+        prompts={getSpectrumConceptsFromPrompts()}
+        userPacks={userPacks}
+        currentUsername={username}
+        onClose={() => setShowPackModal(false)}
+        onCreatePack={handleCreatePack}
+        onAddToExistingPack={handleAddToExistingPack}
+        onSetUsername={setCurrentUsername}
+      />
     </div>
   );
 };

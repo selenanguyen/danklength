@@ -155,12 +155,12 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
     return "Rough. Keep practicing 💪";
   };
 
-  const handleCreatePack = (packName: string, selectedPrompts: SpectrumConcept[]) => {
-    createPack(packName, selectedPrompts);
+  const handleCreatePack = async (packName: string, selectedPrompts: SpectrumConcept[]) => {
+    await createPack(packName, selectedPrompts);
   };
 
-  const handleAddToExistingPack = (packId: string, selectedPrompts: SpectrumConcept[]) => {
-    addToExistingPack(packId, selectedPrompts);
+  const handleAddToExistingPack = async (packId: string, selectedPrompts: SpectrumConcept[]) => {
+    await addToExistingPack(packId, selectedPrompts);
   };
 
   // Check if this was a custom game with prompts to save

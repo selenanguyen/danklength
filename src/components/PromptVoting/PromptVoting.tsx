@@ -20,7 +20,6 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
   promptVotes,
   votingTimeLeft,
   currentPlayerId,
-  currentUsername,
   onVotePrompt,
   onLockIn,
   onUnlockVote,

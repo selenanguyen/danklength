@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../../hooks/useSocket';
-import type { GameConfig } from '../../types';
+import type { GameConfig, SpectrumConcept } from '../../types';
+import { useUserPacks } from '../../hooks/useUserPacks';
+import { PackSelectionModal } from '../PackSelectionModal/PackSelectionModal';
 import './MultiplayerLobby.css';
 
 interface MultiplayerLobbyProps {
@@ -42,6 +44,24 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   const [autoStartTimer, setAutoStartTimer] = useState<number | null>(null);
   const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null);
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
+  const [showPackModal, setShowPackModal] = useState(false);
+
+  const {
+    userPacks,
+    username,
+    setCurrentUsername,
+    createPack,
+    addToExistingPack,
+    loadPackPrompts,
+  } = useUserPacks();
+
+  // Set username when we have multiplayer player info
+  useEffect(() => {
+    const currentPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
+    if (currentPlayer?.name) {
+      setCurrentUsername(currentPlayer.name);
+    }
+  }, [multiplayerState.players, multiplayerState.currentPlayerId, setCurrentUsername]);
 
   // Use shared prompts from multiplayer state
   const submittedPrompts = multiplayerState.sharedPrompts;
@@ -132,6 +152,37 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
       e.preventDefault();
       submitPrompt();
     }
+  };
+
+  const handleCreatePack = async (packName: string, selectedPrompts: SpectrumConcept[]) => {
+    await createPack(packName, selectedPrompts);
+  };
+
+  const handleAddToExistingPack = async (packId: string, selectedPrompts: SpectrumConcept[]) => {
+    await addToExistingPack(packId, selectedPrompts);
+  };
+
+  const handleLoadFromPack = (packId: string) => {
+    const packPrompts = loadPackPrompts(packId);
+    if (packPrompts && multiplayerState.isHost) {
+      // Load prompts one by one for multiplayer synchronization
+      packPrompts.forEach(prompt => {
+        const promptString = `${prompt.leftConcept} vs ${prompt.rightConcept}`;
+        submitCustomPrompt(promptString);
+      });
+    }
+  };
+
+  // Convert submitted prompts to SpectrumConcept objects for pack saving
+  const getSpectrumConceptsFromPrompts = (): SpectrumConcept[] => {
+    return submittedPrompts.map((prompt, index) => {
+      const parts = prompt.split(' vs ');
+      return {
+        id: `multiplayer-${Date.now()}-${index}`,
+        leftConcept: parts[0]?.trim() || 'Left',
+        rightConcept: parts[1]?.trim() || 'Right',
+      };
+    });
   };
 
   const handleBack = () => {
@@ -334,6 +385,33 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
               </div>
             )}
 
+            {gameMode === 'custom' && (userPacks.length > 0 || submittedPrompts.length > 0) && (
+              <div className="pack-buttons-section">
+                {userPacks.length > 0 && (
+                  <select 
+                    onChange={(e) => e.target.value && handleLoadFromPack(e.target.value)}
+                    value=""
+                    className="load-pack-button-compact"
+                  >
+                    <option value="">📦 Load Pack</option>
+                    {userPacks.map(pack => (
+                      <option key={pack.id} value={pack.id}>
+                        {pack.name} ({pack.prompts.length})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {submittedPrompts.length > 0 && (
+                  <button
+                    onClick={() => setShowPackModal(true)}
+                    className="save-pack-button-compact"
+                  >
+                    💾 Save to Pack
+                  </button>
+                )}
+              </div>
+            )}
+
             <button 
               onClick={handleStartGame} 
               className="start-game-button"
@@ -347,7 +425,9 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
         {/* Show custom prompts section to non-hosts when in custom mode */}
         {!multiplayerState.isHost && gameMode === 'custom' && (
           <div className="prompts-section">
-            <h3>Spectrums</h3>
+            <div className="prompts-header">
+              <h3>Spectrums</h3>
+            </div>
             
             {/* Submitted prompts display */}
             {submittedPrompts.length > 0 && (
@@ -406,6 +486,33 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
           </div>
         )}
 
+        {!multiplayerState.isHost && gameMode === 'custom' && (userPacks.length > 0 || submittedPrompts.length > 0) && (
+          <div className="pack-buttons-section">
+            {userPacks.length > 0 && (
+              <select 
+                onChange={(e) => e.target.value && handleLoadFromPack(e.target.value)}
+                value=""
+                className="load-pack-button-compact"
+              >
+                <option value="">📦 Load Pack</option>
+                {userPacks.map(pack => (
+                  <option key={pack.id} value={pack.id}>
+                    {pack.name} ({pack.prompts.length})
+                  </option>
+                ))}
+              </select>
+            )}
+            {submittedPrompts.length > 0 && (
+              <button
+                onClick={() => setShowPackModal(true)}
+                className="save-pack-button-compact"
+              >
+                💾 Save to Pack
+              </button>
+            )}
+          </div>
+        )}
+
         {!multiplayerState.isHost && (
           <div className="waiting-message">
             <p>Waiting for host to start the game...</p>
@@ -428,6 +535,17 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
             </button>
           </div>
         )}
+
+        <PackSelectionModal
+          isOpen={showPackModal}
+          prompts={getSpectrumConceptsFromPrompts()}
+          userPacks={userPacks}
+          currentUsername={username || multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name}
+          onClose={() => setShowPackModal(false)}
+          onCreatePack={handleCreatePack}
+          onAddToExistingPack={handleAddToExistingPack}
+          onSetUsername={setCurrentUsername}
+        />
       </div>
     );
   }

@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 
 // Spectrum concepts data
 const spectrumConcepts = [
@@ -128,7 +130,7 @@ const io = socketIo(server, {
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   res.header('Access-Control-Allow-Origin', origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, ngrok-skip-browser-warning, bypass-tunnel-reminder');
   res.header('Access-Control-Allow-Credentials', 'true');
   
@@ -170,8 +172,82 @@ app.get('/api/random-concept', (req, res) => {
   res.json(getRandomConcept());
 });
 
+// Pack API endpoints
+app.get('/api/packs/:username', (req, res) => {
+  const { username } = req.params;
+  const userData = userPacks.get(username);
+  res.json(userData?.packs || []);
+});
+
+app.post('/api/packs/:username', (req, res) => {
+  const { username } = req.params;
+  const { packs } = req.body;
+  
+  userPacks.set(username, {
+    packs: packs || [],
+    lastUpdated: new Date().toISOString()
+  });
+  
+  // Save to file after update
+  savePacksToFile();
+  
+  res.json({ success: true });
+});
+
+app.put('/api/packs/:username', (req, res) => {
+  const { username } = req.params;
+  const { packs } = req.body;
+  
+  userPacks.set(username, {
+    packs: packs || [],
+    lastUpdated: new Date().toISOString()
+  });
+  
+  // Save to file after update
+  savePacksToFile();
+  
+  res.json({ success: true });
+});
+
 // Game rooms storage
 const gameRooms = new Map();
+
+// User packs storage with file persistence
+const PACKS_FILE = path.join(__dirname, 'user-packs.json');
+const userPacks = new Map(); // username -> { packs: PromptPack[], lastUpdated: string }
+
+// Load packs from file on startup
+function loadPacksFromFile() {
+  try {
+    if (fs.existsSync(PACKS_FILE)) {
+      const data = fs.readFileSync(PACKS_FILE, 'utf8');
+      const packsData = JSON.parse(data);
+      
+      // Convert array back to Map
+      Object.entries(packsData).forEach(([username, userData]) => {
+        userPacks.set(username, userData);
+      });
+      
+      console.log(`Loaded packs for ${userPacks.size} users from file`);
+    }
+  } catch (error) {
+    console.error('Error loading packs from file:', error);
+  }
+}
+
+// Save packs to file
+function savePacksToFile() {
+  try {
+    // Convert Map to plain object for JSON storage
+    const packsData = Object.fromEntries(userPacks);
+    fs.writeFileSync(PACKS_FILE, JSON.stringify(packsData, null, 2));
+  } catch (error) {
+    console.error('Error saving packs to file:', error);
+  }
+}
+
+// Load packs on server startup
+loadPacksFromFile();
 
 // Generate random 4-character game code
 function generateGameCode() {

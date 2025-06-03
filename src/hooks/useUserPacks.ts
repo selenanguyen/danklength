@@ -1,20 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
-import type { PromptPack, UserPackData, SpectrumConcept } from '../types';
-
-const STORAGE_KEY = 'danklength-user-packs';
+import type { PromptPack, SpectrumConcept } from '../types';
+import { config } from '../config';
 
 export const useUserPacks = (currentUsername?: string) => {
   const [userPacks, setUserPacks] = useState<PromptPack[]>([]);
   const [username, setUsername] = useState<string>(currentUsername || '');
 
-  // Load user packs from localStorage
-  const loadUserPacks = useCallback((usernameToLoad: string) => {
+  // Load user packs from server
+  const loadUserPacks = useCallback(async (usernameToLoad: string): Promise<PromptPack[]> => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const allUserData: UserPackData[] = JSON.parse(stored);
-        const userData = allUserData.find(data => data.username === usernameToLoad);
-        return userData?.packs || [];
+      const response = await fetch(`${config.serverUrl}/api/packs/${encodeURIComponent(usernameToLoad)}`);
+      if (response.ok) {
+        return await response.json();
       }
     } catch (error) {
       console.error('Error loading user packs:', error);
@@ -22,27 +19,20 @@ export const useUserPacks = (currentUsername?: string) => {
     return [];
   }, []);
 
-  // Save user packs to localStorage
-  const saveUserPacks = useCallback((usernameToSave: string, packs: PromptPack[]) => {
+  // Save user packs to server
+  const saveUserPacks = useCallback(async (usernameToSave: string, packs: PromptPack[]) => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      let allUserData: UserPackData[] = stored ? JSON.parse(stored) : [];
+      const response = await fetch(`${config.serverUrl}/api/packs/${encodeURIComponent(usernameToSave)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ packs }),
+      });
       
-      // Update or add user data
-      const existingUserIndex = allUserData.findIndex(data => data.username === usernameToSave);
-      const userData: UserPackData = {
-        username: usernameToSave,
-        packs,
-        lastUpdated: new Date().toISOString(),
-      };
-
-      if (existingUserIndex >= 0) {
-        allUserData[existingUserIndex] = userData;
-      } else {
-        allUserData.push(userData);
+      if (!response.ok) {
+        throw new Error('Failed to save packs');
       }
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allUserData));
     } catch (error) {
       console.error('Error saving user packs:', error);
     }
@@ -51,8 +41,9 @@ export const useUserPacks = (currentUsername?: string) => {
   // Load packs when username changes
   useEffect(() => {
     if (username) {
-      const packs = loadUserPacks(username);
-      setUserPacks(packs);
+      loadUserPacks(username).then(packs => {
+        setUserPacks(packs);
+      });
     }
   }, [username, loadUserPacks]);
 
@@ -62,8 +53,12 @@ export const useUserPacks = (currentUsername?: string) => {
   }, []);
 
   // Create a new pack
-  const createPack = useCallback((packName: string, prompts: SpectrumConcept[]) => {
-    if (!username) return;
+  const createPack = useCallback(async (packName: string, prompts: SpectrumConcept[]) => {
+    if (!username) {
+      console.error('Cannot create pack: username not set');
+      alert('Error: Username not set. Please try again.');
+      return;
+    }
 
     const newPack: PromptPack = {
       id: `pack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -76,14 +71,18 @@ export const useUserPacks = (currentUsername?: string) => {
 
     const updatedPacks = [...userPacks, newPack];
     setUserPacks(updatedPacks);
-    saveUserPacks(username, updatedPacks);
+    await saveUserPacks(username, updatedPacks);
     
     return newPack;
   }, [username, userPacks, saveUserPacks]);
 
   // Add prompts to an existing pack
-  const addToExistingPack = useCallback((packId: string, newPrompts: SpectrumConcept[]) => {
-    if (!username) return;
+  const addToExistingPack = useCallback(async (packId: string, newPrompts: SpectrumConcept[]) => {
+    if (!username) {
+      console.error('Cannot add to pack: username not set');
+      alert('Error: Username not set. Please try again.');
+      return;
+    }
 
     const updatedPacks = userPacks.map(pack => {
       if (pack.id === packId) {
@@ -102,20 +101,20 @@ export const useUserPacks = (currentUsername?: string) => {
     });
 
     setUserPacks(updatedPacks);
-    saveUserPacks(username, updatedPacks);
+    await saveUserPacks(username, updatedPacks);
   }, [username, userPacks, saveUserPacks]);
 
   // Delete a pack
-  const deletePack = useCallback((packId: string) => {
+  const deletePack = useCallback(async (packId: string) => {
     if (!username) return;
 
     const updatedPacks = userPacks.filter(pack => pack.id !== packId);
     setUserPacks(updatedPacks);
-    saveUserPacks(username, updatedPacks);
+    await saveUserPacks(username, updatedPacks);
   }, [username, userPacks, saveUserPacks]);
 
   // Rename a pack
-  const renamePack = useCallback((packId: string, newName: string) => {
+  const renamePack = useCallback(async (packId: string, newName: string) => {
     if (!username) return;
 
     const updatedPacks = userPacks.map(pack => 
@@ -123,22 +122,16 @@ export const useUserPacks = (currentUsername?: string) => {
     );
     
     setUserPacks(updatedPacks);
-    saveUserPacks(username, updatedPacks);
+    await saveUserPacks(username, updatedPacks);
   }, [username, userPacks, saveUserPacks]);
 
-  // Get all users for potential sharing features
-  const getAllUsers = useCallback((): string[] => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const allUserData: UserPackData[] = JSON.parse(stored);
-        return allUserData.map(data => data.username);
-      }
-    } catch (error) {
-      console.error('Error loading users:', error);
-    }
-    return [];
-  }, []);
+  // Load prompts from a specific pack
+  const loadPackPrompts = useCallback((packId: string): SpectrumConcept[] => {
+    const pack = userPacks.find(p => p.id === packId);
+    return pack?.prompts || [];
+  }, [userPacks]);
+
+  // Get all users for potential sharing features (removed - would need separate API endpoint)
 
   return {
     userPacks,
@@ -148,6 +141,6 @@ export const useUserPacks = (currentUsername?: string) => {
     addToExistingPack,
     deletePack,
     renamePack,
-    getAllUsers,
+    loadPackPrompts,
   };
 };

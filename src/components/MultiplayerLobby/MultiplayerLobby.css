@@ -525,7 +525,7 @@
 }
 
 .host-controls {
-  margin-bottom: 30px;
+  margin-bottom: 15px;
 }
 
 .game-mode-selection {
@@ -686,6 +686,7 @@
   padding: 0 20px;
   color: #6c757d;
   font-style: italic;
+  margin-bottom: 15px;
 }
 
 .waiting-for-prompts {
@@ -796,5 +797,103 @@
   .prompt-card {
     max-width: 100%;
     min-width: 80px;
+  }
+}
+
+
+/* Pack buttons section styling */
+.pack-buttons-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin: 15px 0;
+  flex-wrap: nowrap;
+}
+
+.save-pack-button-compact {
+  background: linear-gradient(135deg, #6f42c1, #8a63d2);
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: auto;
+  max-width: 150px;
+  min-width: 130px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.save-pack-button-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+}
+
+.load-pack-button-compact {
+  background: linear-gradient(135deg, #28a745, #34ce57);
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: auto;
+  max-width: 130px;
+  min-width: 110px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.load-pack-button-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  background: linear-gradient(135deg, #218838, #28a745);
+}
+
+.load-pack-button-compact:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.25);
+}
+
+/* Responsive pack buttons */
+@media (max-width: 600px) {
+  .pack-buttons-section {
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+  }
+  
+  .load-pack-button-compact,
+  .save-pack-button-compact {
+    max-width: 200px;
+    min-width: 150px;
+    font-size: 13px;
+    padding: 8px 15px;
+    width: auto;
+    align-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .pack-buttons-section {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .load-pack-button-compact,
+  .save-pack-button-compact {
+    max-width: 180px;
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 12px;
   }
 }
