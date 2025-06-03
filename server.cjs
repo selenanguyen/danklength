@@ -583,7 +583,7 @@ io.on('connection', (socket) => {
     const nextRound = room.gameState.currentRound + 1;
     const totalRounds = room.gameState.totalRounds || 8;
     
-    if (nextRound > totalRounds) {
+    if (nextRound > 1) { // TODO (Selena, not claude): change this back to totalRounds
       // Game should end
       room.gameState.gamePhase = 'ended';
       io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
@@ -935,6 +935,50 @@ io.on('connection', (socket) => {
       }
 
       console.log(`${player.name} left game: ${room.code}`);
+    }
+  });
+
+  // Handle player actions (including emoji reactions)
+  socket.on('player-action', (data) => {
+    const { action, data: actionData } = data;
+    
+    if (action === 'emoji-reaction') {
+      const { emoji } = actionData;
+      
+      // Find which room this socket is in
+      let userRoom = null;
+      for (const [code, room] of gameRooms.entries()) {
+        if (room.players.find(p => p.id === socket.id)) {
+          userRoom = room;
+          break;
+        }
+      }
+      
+      if (userRoom) {
+        // Broadcast emoji reaction to all other players in the room (not the sender)
+        socket.to(userRoom.code).emit('emoji-reaction', { emoji });
+        console.log(`Emoji reaction ${emoji} sent to room ${userRoom.code}`);
+      }
+    }
+  });
+
+  // Handle emoji reactions (direct event)
+  socket.on('emoji-reaction', (data) => {
+    const { emoji } = data;
+    
+    // Find which room this socket is in
+    let userRoom = null;
+    for (const [code, room] of gameRooms.entries()) {
+      if (room.players.find(p => p.id === socket.id)) {
+        userRoom = room;
+        break;
+      }
+    }
+    
+    if (userRoom) {
+      // Broadcast emoji reaction to all other players in the room (not the sender)
+      socket.to(userRoom.code).emit('emoji-reaction', { emoji });
+      console.log(`Emoji reaction ${emoji} sent to room ${userRoom.code}`);
     }
   });
 

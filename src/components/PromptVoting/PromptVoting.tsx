@@ -7,6 +7,7 @@ interface PromptVotingProps {
   promptVotes: PromptVote[];
   votingTimeLeft: number;
   currentPlayerId: string;
+  currentUsername?: string;
   onVotePrompt: (promptId: string) => void;
   onLockIn: () => void;
   onUnlockVote: () => void;
@@ -19,6 +20,7 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
   promptVotes,
   votingTimeLeft,
   currentPlayerId,
+  currentUsername,
   onVotePrompt,
   onLockIn,
   onUnlockVote,
@@ -69,6 +71,7 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
       handleSubmitNewPrompt();
     }
   };
+
 
   return (
     <div className="prompt-voting">
@@ -150,13 +153,15 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
       </div>
 
       <div className="voting-actions" style={{ marginTop: '30px' }}>
-        <button
-          className={`lock-in-button ${isLockedIn ? 'locked' : ''}`}
-          onClick={handleLockIn}
-          disabled={isLockedIn}
-        >
-          {isLockedIn ? '✓ Locked In' : 'Lock In'}
-        </button>
+        <div className="main-actions">
+          <button
+            className={`lock-in-button ${isLockedIn ? 'locked' : ''}`}
+            onClick={handleLockIn}
+            disabled={isLockedIn}
+          >
+            {isLockedIn ? '✓ Locked In' : 'Lock In'}
+          </button>
+        </div>
         {selectedPromptId === '' && !isLockedIn && (
           <p className="abstain-info">Lock in without voting to abstain</p>
         )}
@@ -168,6 +173,7 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
       <div className="voting-status">
         <p>{promptVotes.filter(v => v.isLockedIn).length} players locked in</p>
       </div>
+
     </div>
   );
 };

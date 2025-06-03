@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useGameState } from './hooks/useGameState';
 import { useSocket } from './hooks/useSocket';
 import { GameSetup } from './components/GameSetup/GameSetup';
@@ -7,6 +7,7 @@ import { MultiplayerLobby } from './components/MultiplayerLobby/MultiplayerLobby
 import { PromptVoting } from './components/PromptVoting/PromptVoting';
 import { SpectrumCard } from './components/SpectrumCard/SpectrumCard';
 import { Dial } from './components/Dial/Dial';
+import { ScoreReveal } from './components/ScoreReveal/ScoreReveal';
 import type { GameConfig } from './types';
 import './App.css';
 
@@ -33,6 +34,59 @@ function App() {
 
   const [clueInput, setClueInput] = useState('');
   const [playMode, setPlayMode] = useState<'local' | 'remote' | null>(null);
+
+  // Emoji reaction system
+  const [fallingEmojis, setFallingEmojis] = useState<Array<{
+    id: string;
+    emoji: string;
+    x: number;
+    y: number;
+  }>>([]);
+
+  const EMOJIS = ['😍', '😭', '😠', '🪩', '😘', '💩'];
+
+  // Emoji reaction functions
+  const createFallingEmoji = useCallback((emoji: string) => {
+    const newEmoji = {
+      id: Date.now() + Math.random().toString(),
+      emoji,
+      x: Math.random() * (window.innerWidth - 50) + 25, // Random x position with padding
+      y: -50 // Start above screen
+    };
+    
+    setFallingEmojis(prev => [...prev, newEmoji]);
+    
+    // Remove emoji after animation completes
+    setTimeout(() => {
+      setFallingEmojis(prev => prev.filter(e => e.id !== newEmoji.id));
+    }, 3000);
+  }, []);
+
+  const handleEmojiClick = useCallback((emoji: string) => {
+    // Create local falling emoji immediately
+    createFallingEmoji(emoji);
+    
+    // Send to other players if connected
+    if (playMode === 'remote' && multiplayerState.isConnected) {
+      sendPlayerAction('emoji-reaction', { emoji });
+    }
+  }, [playMode, multiplayerState.isConnected, sendPlayerAction, createFallingEmoji]);
+
+  // Listen for emoji reactions from other players
+  useEffect(() => {
+    if (playMode !== 'remote') return;
+
+    const handleEmojiReaction = (...args: unknown[]) => {
+      const data = args[0] as { emoji: string };
+      createFallingEmoji(data.emoji);
+    };
+
+    const { addEventListener, removeEventListener } = socketInstance;
+    addEventListener('emoji-reaction', handleEmojiReaction);
+    return () => {
+      removeEventListener('emoji-reaction', handleEmojiReaction);
+    };
+  }, [playMode, socketInstance, createFallingEmoji]);
 
   // Listen for multiplayer game start events
   useEffect(() => {
@@ -309,6 +363,9 @@ function App() {
     const promptVotes = playMode === 'remote' ? multiplayerState.promptVotes : (gameState.promptVotes || []);
     const votingTimeLeft = playMode === 'remote' ? multiplayerState.votingTimeLeft : (gameState.votingTimeLeft || 0);
     const currentPlayerId = playMode === 'remote' ? (multiplayerState.currentPlayerId || '') : 'local-player';
+    const currentUsername = playMode === 'remote' 
+      ? multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name
+      : undefined;
 
     return (
       <div className="game-container full-height">
@@ -317,6 +374,7 @@ function App() {
           promptVotes={promptVotes}
           votingTimeLeft={votingTimeLeft}
           currentPlayerId={currentPlayerId}
+          currentUsername={currentUsername}
           onVotePrompt={voteForPrompt}
           onLockIn={lockInVote}
           onUnlockVote={() => {
@@ -337,55 +395,18 @@ function App() {
     );
   }
 
-  // Game ended screen
+  // Game ended screen - Wavelength-style score reveal
   if (gameState.gamePhase === 'ended') {
-    const { totalScore, roundScores, players } = gameState;
-    const maxPossibleScore = roundScores.length * 5;
-    const percentage = Math.round((totalScore / maxPossibleScore) * 100);
-    
+    const endGameUsername = playMode === 'remote' 
+      ? multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name
+      : undefined;
+      
     return (
-      <div className="game-container compact">
-        <div className="game-ended">
-          <h1>🎉 Game Complete! 🎉</h1>
-          
-          <div className="final-score">
-            <div className="score-display">
-              <div className="total-score">{totalScore}</div>
-              <div className="score-details">
-                out of {maxPossibleScore} points ({percentage}%)
-              </div>
-            </div>
-          </div>
-
-          <div className="round-breakdown">
-            <h3>Round Breakdown</h3>
-            <div className="rounds-grid">
-              {roundScores.map((score, index) => (
-                <div key={index} className="round-score">
-                  <span className="round-label">Round {index + 1}</span>
-                  <span className="round-points">{score} pts</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="players-list-final">
-            <h3>Players</h3>
-            <div className="players">
-              {players.map((player, index) => (
-                <span key={player.id} className="player-name">
-                  {player.name}
-                  {index < players.length - 1 && ', '}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <button className="action-button" onClick={resetGame}>
-            Play Again
-          </button>
-        </div>
-      </div>
+      <ScoreReveal 
+        gameState={gameState}
+        currentUsername={endGameUsername}
+        onFinish={resetGame}
+      />
     );
   }
 
@@ -425,25 +446,29 @@ function App() {
   // Check if player is disconnected during remote play
   const isDisconnectedDuringGame = playMode === 'remote' && !multiplayerState.isConnected && gameState.gamePhase !== 'setup';
 
+  // Show emoji reactions during active gameplay (not during setup screens)
+  const showEmojiReactions = gameState.gamePhase !== 'setup' && gameState.gamePhase !== 'player-setup' && playMode !== null;
+
   return (
-    <div className="game-container full-height">
-      {/* Disconnection overlay */}
-      {isDisconnectedDuringGame && (
-        <div className="disconnection-overlay">
-          <div className="disconnection-modal">
-            <h2>⚠️ Connection Lost</h2>
-            <p>You've been disconnected from the game.</p>
-            <div className="reconnection-actions">
-              <button className="reconnect-button" onClick={handleReconnect}>
-                🔄 Reconnect
-              </button>
-              <button className="leave-game-button" onClick={handleBackToWelcome}>
-                🏠 Back to Menu
-              </button>
+    <>
+      <div className="game-container full-height">
+        {/* Disconnection overlay */}
+        {isDisconnectedDuringGame && (
+          <div className="disconnection-overlay">
+            <div className="disconnection-modal">
+              <h2>⚠️ Connection Lost</h2>
+              <p>You've been disconnected from the game.</p>
+              <div className="reconnection-actions">
+                <button className="reconnect-button" onClick={handleReconnect}>
+                  🔄 Reconnect
+                </button>
+                <button className="leave-game-button" onClick={handleBackToWelcome}>
+                  🏠 Back to Menu
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
       
       <div className="game-header">
         <div className="game-progress">
@@ -646,6 +671,54 @@ function App() {
         )}
       </div>
     </div>
+
+    {/* Emoji Reaction System - Available during active gameplay */}
+    {showEmojiReactions && (
+      <div className="emoji-reactions">
+        {/* Left side emoji buttons */}
+        <div className="emoji-buttons-left">
+          {EMOJIS.slice(0, 3).map((emoji, index) => (
+            <button
+              key={`left-${index}`}
+              className="emoji-button"
+              onClick={() => handleEmojiClick(emoji)}
+              type="button"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+
+        {/* Right side emoji buttons */}
+        <div className="emoji-buttons-right">
+          {EMOJIS.slice(3, 6).map((emoji, index) => (
+            <button
+              key={`right-${index}`}
+              className="emoji-button"
+              onClick={() => handleEmojiClick(emoji)}
+              type="button"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+
+        {/* Falling emojis */}
+        {fallingEmojis.map((fallingEmoji) => (
+          <div
+            key={fallingEmoji.id}
+            className="falling-emoji"
+            style={{
+              left: `${fallingEmoji.x}px`,
+              top: `${fallingEmoji.y}px`,
+            }}
+          >
+            {fallingEmoji.emoji}
+          </div>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
 

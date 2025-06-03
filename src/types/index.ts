@@ -65,5 +65,20 @@ export interface PromptPack {
   name: string;
   prompts: SpectrumConcept[];
   createdBy: string;
+  createdAt: string;
   isPublic: boolean;
+}
+
+export interface UserPackData {
+  username: string;
+  packs: PromptPack[];
+  lastUpdated: string;
+}
+
+export interface PackSelectionModalProps {
+  isOpen: boolean;
+  prompts: SpectrumConcept[];
+  currentUsername?: string;
+  onClose: () => void;
+  onSave: (packName: string, selectedPrompts: SpectrumConcept[], packId?: string) => void;
 }
