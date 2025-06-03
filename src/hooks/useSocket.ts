@@ -289,6 +289,23 @@ export const useSocket = () => {
       }));
     });
 
+    // Custom prompt added during voting
+    socket.on('prompt-added-during-voting', (data) => {
+      console.log('Prompt added during voting:', data);
+      setMultiplayerState(prev => {
+        const newState = {
+          ...prev,
+          sharedPrompts: data.prompts,
+          syncedGameState: {
+            ...prev.syncedGameState,
+            customPrompts: data.customPrompts,
+          },
+        };
+        console.log('Updated multiplayer state with new prompts:', newState.syncedGameState?.customPrompts);
+        return newState;
+      });
+    });
+
     // Game mode synchronization
     socket.on('game-mode-updated', (data) => {
       console.log('Game mode updated:', data);
@@ -502,6 +519,25 @@ export const useSocket = () => {
     }
   };
 
+  const unlockVote = () => {
+    if (socketRef.current && multiplayerState.gameCode && multiplayerState.currentPlayerId) {
+      socketRef.current.emit('unlock-vote', {
+        gameCode: multiplayerState.gameCode,
+        playerId: multiplayerState.currentPlayerId,
+      });
+    }
+  };
+
+  const submitCustomPromptDuringVoting = (prompt: string) => {
+    if (socketRef.current && multiplayerState.gameCode && multiplayerState.currentPlayerId && prompt.trim()) {
+      socketRef.current.emit('add-prompt-during-voting', {
+        gameCode: multiplayerState.gameCode,
+        prompt: prompt.trim(),
+        playerId: multiplayerState.currentPlayerId,
+      });
+    }
+  };
+
   const nextRound = () => {
     if (socketRef.current && multiplayerState.gameCode) {
       socketRef.current.emit('next-round', {
@@ -529,6 +565,8 @@ export const useSocket = () => {
     removeEventListener,
     voteForPrompt,
     lockInVote,
+    unlockVote,
+    submitCustomPromptDuringVoting,
     nextRound,
   };
 };

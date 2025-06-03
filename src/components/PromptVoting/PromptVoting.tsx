@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { SpectrumConcept, PromptVote } from '../../types';
 import './PromptVoting.css';
 
@@ -9,6 +9,8 @@ interface PromptVotingProps {
   currentPlayerId: string;
   onVotePrompt: (promptId: string) => void;
   onLockIn: () => void;
+  onUnlockVote: () => void;
+  onAddNewPrompt: (prompt: string) => void;
   currentRound: number;
 }
 
@@ -19,8 +21,13 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
   currentPlayerId,
   onVotePrompt,
   onLockIn,
+  onUnlockVote,
+  onAddNewPrompt,
   currentRound,
 }) => {
+  const [newPromptLeft, setNewPromptLeft] = useState('');
+  const [newPromptRight, setNewPromptRight] = useState('');
+  
   const currentPlayerVote = promptVotes.find(vote => vote.playerId === currentPlayerId);
   const selectedPromptId = currentPlayerVote?.promptId || '';
   const isLockedIn = currentPlayerVote?.isLockedIn || false;
@@ -36,13 +43,31 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
   };
 
   const handlePromptClick = (promptId: string) => {
-    if (isLockedIn) return;
+    // If player is locked in and clicking a different prompt, unlock first
+    if (isLockedIn && selectedPromptId !== promptId) {
+      onUnlockVote();
+    }
     onVotePrompt(promptId);
   };
 
   const handleLockIn = () => {
     if (isLockedIn) return;
     onLockIn();
+  };
+
+  const handleSubmitNewPrompt = () => {
+    if (newPromptLeft.trim() && newPromptRight.trim()) {
+      const newPrompt = `${newPromptLeft.trim()} vs ${newPromptRight.trim()}`;
+      onAddNewPrompt(newPrompt);
+      setNewPromptLeft('');
+      setNewPromptRight('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSubmitNewPrompt();
+    }
   };
 
   return (
@@ -68,7 +93,7 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
           return (
             <div
               key={prompt.id}
-              className={`prompt-card ${isSelected ? 'selected' : ''} ${isLockedIn && !isSelected ? 'locked' : ''}`}
+              className={`prompt-card ${isSelected ? 'selected' : ''}`}
               style={{ 
                 '--appear-delay': `${index * 0.1}s`,
                 '--float-delay': `${index * 0.3}s`
@@ -88,7 +113,43 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
         })}
       </div>
 
-      <div className="voting-actions" style={{ marginTop: '40px' }}>
+      {/* New prompt input section */}
+      <div className="new-prompt-section" style={{ marginTop: '20px' }}>
+        <div className="new-prompt-input">
+          <div className="compact-prompt-input-group">
+            <input
+              type="text"
+              className="compact-prompt-input"
+              placeholder="Small"
+              value={newPromptLeft}
+              onChange={(e) => setNewPromptLeft(e.target.value)}
+              onKeyPress={handleKeyPress}
+              maxLength={15}
+              disabled={votingTimeLeft <= 0}
+            />
+            <span className="compact-vs-divider">vs</span>
+            <input
+              type="text"
+              className="compact-prompt-input"
+              placeholder="Big"
+              value={newPromptRight}
+              onChange={(e) => setNewPromptRight(e.target.value)}
+              onKeyPress={handleKeyPress}
+              maxLength={15}
+              disabled={votingTimeLeft <= 0}
+            />
+            <button
+              className="compact-submit-button"
+              onClick={handleSubmitNewPrompt}
+              disabled={!newPromptLeft.trim() || !newPromptRight.trim() || votingTimeLeft <= 0}
+            >
+              +
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="voting-actions" style={{ marginTop: '30px' }}>
         <button
           className={`lock-in-button ${isLockedIn ? 'locked' : ''}`}
           onClick={handleLockIn}
@@ -98,6 +159,9 @@ export const PromptVoting: React.FC<PromptVotingProps> = ({
         </button>
         {selectedPromptId === '' && !isLockedIn && (
           <p className="abstain-info">Lock in without voting to abstain</p>
+        )}
+        {isLockedIn && (
+          <p className="change-vote-info">Click any prompt to change your vote</p>
         )}
       </div>
 

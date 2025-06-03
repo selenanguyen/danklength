@@ -266,6 +266,9 @@ function finishVoting(gameCode) {
   room.gameState.gamePhase = 'psychic';
   room.gameState.promptVotes = []; // Clear votes
   
+  // Ensure custom prompts are preserved in the game state
+  room.gameState.customPrompts = getCustomPromptsAsConcepts(room.customPrompts);
+  
   // Broadcast the selected prompt and new phase
   io.to(gameCode).emit('voting-finished', {
     selectedPrompt: selectedPrompt,
@@ -605,6 +608,9 @@ io.on('connection', (socket) => {
       room.gameState.gamePhase = 'prompt-voting';
       room.gameState.votingTimeLeft = 10;
       
+      // Ensure custom prompts are preserved in the game state
+      room.gameState.customPrompts = getCustomPromptsAsConcepts(room.customPrompts);
+      
       // Broadcast the new round with voting phase
       io.to(room.code).emit('new-round-voting', {
         currentRound: room.gameState.currentRound,
@@ -753,6 +759,104 @@ io.on('connection', (socket) => {
     }
 
     console.log(`Player ${playerId} locked in vote for game ${room.code}. Total votes: ${room.gameState.promptVotes.length}`);
+  });
+
+  // Handle unlock vote
+  socket.on('unlock-vote', (data) => {
+    const { gameCode, playerId } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || !room.gameState || room.gameState.gamePhase !== 'prompt-voting') return;
+
+    // Initialize promptVotes array if it doesn't exist
+    if (!room.gameState.promptVotes) {
+      room.gameState.promptVotes = [];
+    }
+
+    console.log(`=== UNLOCK DEBUG: Player ${playerId} unlocking vote ===`);
+    console.log('Before unlock, all votes:', JSON.stringify(room.gameState.promptVotes, null, 2));
+    
+    // Find and update player's vote to unlocked
+    const voteIndex = room.gameState.promptVotes.findIndex(v => v.playerId === playerId);
+    console.log(`Found vote at index: ${voteIndex}`);
+    
+    if (voteIndex >= 0) {
+      // Player has an existing vote - unlock it
+      console.log('Existing vote found:', JSON.stringify(room.gameState.promptVotes[voteIndex], null, 2));
+      room.gameState.promptVotes[voteIndex].isLockedIn = false;
+      console.log('After unlocking:', JSON.stringify(room.gameState.promptVotes[voteIndex], null, 2));
+    }
+    
+    console.log('After unlock, all votes:', JSON.stringify(room.gameState.promptVotes, null, 2));
+
+    // Broadcast unlock update
+    io.to(room.code).emit('vote-updated', {
+      promptVotes: room.gameState.promptVotes
+    });
+
+    console.log(`Player ${playerId} unlocked vote for game ${room.code}`);
+  });
+
+  // Handle adding prompt during voting
+  socket.on('add-prompt-during-voting', (data) => {
+    const { gameCode, prompt, playerId } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || !room.gameState || room.gameState.gamePhase !== 'prompt-voting') return;
+
+    // Add prompt to room's custom prompts
+    if (prompt && prompt.trim() && !room.customPrompts.includes(prompt.trim())) {
+      room.customPrompts.push(prompt.trim());
+      
+      // Update game state custom prompts too
+      const promptConcepts = getCustomPromptsAsConcepts(room.customPrompts);
+      room.gameState.customPrompts = promptConcepts;
+      
+      // Get the new prompt ID
+      const newPromptId = `custom-${room.customPrompts.length - 1}`;
+      
+      // Automatically vote for the new prompt
+      if (!room.gameState.promptVotes) {
+        room.gameState.promptVotes = [];
+      }
+      
+      // Find existing vote from this player and update it
+      const existingVoteIndex = room.gameState.promptVotes.findIndex(vote => vote.playerId === playerId);
+      
+      if (existingVoteIndex >= 0) {
+        // Update existing vote to the new prompt
+        room.gameState.promptVotes[existingVoteIndex] = {
+          playerId: playerId,
+          promptId: newPromptId,
+          isLockedIn: false
+        };
+      } else {
+        // Add new vote for the new prompt
+        room.gameState.promptVotes.push({
+          playerId: playerId,
+          promptId: newPromptId,
+          isLockedIn: false
+        });
+      }
+      
+      // Broadcast updated prompts and votes to all players in room
+      io.to(room.code).emit('prompt-added-during-voting', {
+        prompts: room.customPrompts,
+        customPrompts: promptConcepts,
+        addedBy: playerId,
+      });
+      
+      // Also update the main game state for immediate display
+      io.to(room.code).emit('game-state-updated', { 
+        gameState: room.gameState 
+      });
+      
+      io.to(room.code).emit('vote-updated', {
+        promptVotes: room.gameState.promptVotes
+      });
+
+      console.log(`Prompt added during voting to game ${room.code}: "${prompt}" by ${playerId}`);
+    }
   });
 
   // Handle custom prompt submission

@@ -332,3 +332,125 @@
     padding: 6px 12px;
   }
 }
+
+/* New prompt input styles */
+.new-prompt-section {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.new-prompt-input {
+  width: 100%;
+  max-width: 500px;
+}
+
+.compact-prompt-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+.compact-prompt-input {
+  flex: 0 1 120px;
+  padding: 10px 12px;
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: Nunito, Comic Sans MS, cursive, sans-serif;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.3s ease;
+  min-width: 100px;
+  max-width: 140px;
+}
+
+.compact-prompt-input:focus {
+  border-color: #4a90e2;
+}
+
+.compact-prompt-input:disabled {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.compact-vs-divider {
+  font-weight: 600;
+  color: var(--tama-dark);
+  font-size: 14px;
+  text-shadow: 1px 1px 2px var(--tama-shadow);
+  padding: 0 6px;
+  text-transform: lowercase;
+  flex-shrink: 0;
+}
+
+.compact-submit-button {
+  background: linear-gradient(135deg, #28a745, #34ce57);
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
+  min-width: 36px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.compact-submit-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #218838, #1e7e34);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(40, 167, 69, 0.4);
+}
+
+.compact-submit-button:disabled {
+  background: linear-gradient(135deg, #6c757d, #868e96);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 1px 3px rgba(108, 117, 125, 0.3);
+}
+
+/* Change vote info text */
+.change-vote-info {
+  font-size: 14px;
+  color: #6c757d;
+  font-style: italic;
+  margin: 8px 0 0 0;
+  text-align: center;
+}
+
+/* Responsive adjustments for new elements */
+@media (max-width: 768px) {
+  .compact-prompt-input-group {
+    gap: 8px;
+  }
+  
+  .compact-prompt-input {
+    min-width: 85px;
+    max-width: 110px;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  
+  .compact-vs-divider {
+    font-size: 12px;
+    padding: 0 4px;
+  }
+  
+  .compact-submit-button {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    font-size: 16px;
+  }
+}

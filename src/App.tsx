@@ -52,6 +52,15 @@ function App() {
     }
   }, [multiplayerState.syncedGameState, playMode, multiplayerState.isHost, gameState.gamePhase, syncGameState]);
 
+  // Listen for custom prompts updates in multiplayer (host included)
+  useEffect(() => {
+    if (playMode === 'remote' && multiplayerState.syncedGameState?.customPrompts && gameState.gamePhase === 'prompt-voting') {
+      console.log('Host receiving custom prompts update:', multiplayerState.syncedGameState.customPrompts);
+      // Update host's game state with new custom prompts
+      syncGameState({ customPrompts: multiplayerState.syncedGameState.customPrompts });
+    }
+  }, [multiplayerState.syncedGameState?.customPrompts, playMode, gameState.gamePhase, syncGameState]);
+
   // Sync game state changes to other players in multiplayer (for host only)
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase !== 'setup') {
@@ -293,7 +302,10 @@ function App() {
 
   // Prompt voting phase (custom mode only)
   if (gameState.gamePhase === 'prompt-voting') {
-    const customPrompts = gameState.customPrompts || [];
+    // For multiplayer, use synced state prompts; for local, use game state prompts
+    const customPrompts = playMode === 'remote' 
+      ? (multiplayerState.syncedGameState?.customPrompts || gameState.customPrompts || [])
+      : (gameState.customPrompts || []);
     const promptVotes = playMode === 'remote' ? multiplayerState.promptVotes : (gameState.promptVotes || []);
     const votingTimeLeft = playMode === 'remote' ? multiplayerState.votingTimeLeft : (gameState.votingTimeLeft || 0);
     const currentPlayerId = playMode === 'remote' ? (multiplayerState.currentPlayerId || '') : 'local-player';
@@ -307,6 +319,18 @@ function App() {
           currentPlayerId={currentPlayerId}
           onVotePrompt={voteForPrompt}
           onLockIn={lockInVote}
+          onUnlockVote={() => {
+            if (playMode === 'remote') {
+              const { unlockVote } = socketInstance;
+              unlockVote();
+            }
+          }}
+          onAddNewPrompt={(prompt) => {
+            if (playMode === 'remote') {
+              const { submitCustomPromptDuringVoting } = socketInstance;
+              submitCustomPromptDuringVoting(prompt);
+            }
+          }}
           currentRound={gameState.currentRound}
         />
       </div>

@@ -301,7 +301,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                       value={leftSide}
                       onChange={(e) => setLeftSide(e.target.value)}
                       onKeyPress={handlePromptKeyPress}
-                      placeholder="Left Side"
+                      placeholder="Small"
                       maxLength={25}
                       className="prompt-side-input"
                     />
@@ -311,7 +311,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                       value={rightSide}
                       onChange={(e) => setRightSide(e.target.value)}
                       onKeyPress={handlePromptKeyPress}
-                      placeholder="Right Side"
+                      placeholder="Big"
                       maxLength={25}
                       className="prompt-side-input"
                     />
@@ -320,7 +320,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                       disabled={!leftSide.trim() || !rightSide.trim()}
                       className="submit-prompt-button"
                     >
-                      Submit
+                      +
                     </button>
                   </div>
                 </div>
@@ -380,7 +380,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                   value={leftSide}
                   onChange={(e) => setLeftSide(e.target.value)}
                   onKeyPress={handlePromptKeyPress}
-                  placeholder="Left Side"
+                  placeholder="Small"
                   maxLength={25}
                   className="prompt-side-input"
                 />
@@ -390,7 +390,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                   value={rightSide}
                   onChange={(e) => setRightSide(e.target.value)}
                   onKeyPress={handlePromptKeyPress}
-                  placeholder="Right Side"
+                  placeholder="Big"
                   maxLength={25}
                   className="prompt-side-input"
                 />
@@ -399,7 +399,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                   disabled={!leftSide.trim() || !rightSide.trim()}
                   className="submit-prompt-button"
                 >
-                  Submit
+                  +
                 </button>
               </div>
             </div>
