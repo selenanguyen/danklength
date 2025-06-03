@@ -36,7 +36,7 @@ function getRandomConcept() {
 // Function to get concept from custom prompts or default concepts
 function getConceptForGame(gameConfig, currentPromptIndex = 0) {
   if (gameConfig.mode === 'custom' && gameConfig.customPrompts && gameConfig.customPrompts.length > 0) {
-    // Use custom prompts if available
+    // Always use custom prompts and cycle through them
     const promptIndex = currentPromptIndex % gameConfig.customPrompts.length;
     const prompt = gameConfig.customPrompts[promptIndex];
     
@@ -56,6 +56,57 @@ function getConceptForGame(gameConfig, currentPromptIndex = 0) {
     // Use default random concept
     return getRandomConcept();
   }
+}
+
+// Function to get all custom prompts as concept objects
+function getCustomPromptsAsConcepts(customPrompts) {
+  return customPrompts.map((prompt, index) => {
+    if (typeof prompt === 'string') {
+      const parts = prompt.split(' vs ');
+      return {
+        id: `custom-${index}`,
+        leftConcept: parts[0] || 'Left',
+        rightConcept: parts[1] || 'Right'
+      };
+    } else {
+      return prompt;
+    }
+  });
+}
+
+// Function to select a prompt based on votes
+function selectPromptFromVotes(customPrompts, votes) {
+  const promptConcepts = getCustomPromptsAsConcepts(customPrompts);
+  
+  if (!votes || votes.length === 0) {
+    // No votes - pick random prompt
+    const randomIndex = Math.floor(Math.random() * promptConcepts.length);
+    return promptConcepts[randomIndex];
+  }
+  
+  // Count votes for each prompt
+  const voteCounts = {};
+  votes.forEach(vote => {
+    if (vote.promptId) {
+      voteCounts[vote.promptId] = (voteCounts[vote.promptId] || 0) + 1;
+    }
+  });
+  
+  if (Object.keys(voteCounts).length === 0) {
+    // No valid votes - pick random prompt
+    const randomIndex = Math.floor(Math.random() * promptConcepts.length);
+    return promptConcepts[randomIndex];
+  }
+  
+  // Find prompt(s) with most votes
+  const maxVotes = Math.max(...Object.values(voteCounts));
+  const topPrompts = Object.keys(voteCounts).filter(promptId => voteCounts[promptId] === maxVotes);
+  
+  // If tie, pick randomly among tied prompts
+  const selectedPromptId = topPrompts[Math.floor(Math.random() * topPrompts.length)];
+  
+  // Find the corresponding prompt concept
+  return promptConcepts.find(p => p.id === selectedPromptId) || promptConcepts[0];
 }
 
 const app = express();
@@ -170,6 +221,59 @@ function cleanupOldRooms() {
 
 // Run cleanup every hour
 setInterval(cleanupOldRooms, 60 * 60 * 1000);
+
+// Voting timers storage
+const votingTimers = new Map();
+
+// Function to start voting timer
+function startVotingTimer(gameCode) {
+  const room = gameRooms.get(gameCode);
+  if (!room || !room.gameState) return;
+  
+  let timeLeft = 10;
+  room.gameState.votingTimeLeft = timeLeft;
+  
+  const timer = setInterval(() => {
+    timeLeft--;
+    room.gameState.votingTimeLeft = timeLeft;
+    
+    // Broadcast time update
+    io.to(gameCode).emit('voting-time-update', { timeLeft });
+    
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+      votingTimers.delete(gameCode);
+      finishVoting(gameCode);
+    }
+  }, 1000);
+  
+  votingTimers.set(gameCode, timer);
+}
+
+// Function to finish voting and select prompt
+function finishVoting(gameCode) {
+  const room = gameRooms.get(gameCode);
+  if (!room || !room.gameState) return;
+  
+  // Select prompt based on votes
+  const selectedPrompt = selectPromptFromVotes(room.customPrompts, room.gameState.promptVotes);
+  
+  // Update game state with selected prompt and move to psychic phase
+  room.gameState.currentCard = selectedPrompt;
+  room.gameState.selectedPromptForRound = selectedPrompt;
+  room.gameState.targetPosition = Math.random() * 100; // Generate new target position
+  room.gameState.targetWidth = 25; // Total target area is 25% of spectrum (containing all scoring zones)
+  room.gameState.gamePhase = 'psychic';
+  room.gameState.promptVotes = []; // Clear votes
+  
+  // Broadcast the selected prompt and new phase
+  io.to(gameCode).emit('voting-finished', {
+    selectedPrompt: selectedPrompt,
+    gameState: room.gameState
+  });
+  
+  console.log(`Voting finished for ${gameCode}, selected: ${selectedPrompt.leftConcept} vs ${selectedPrompt.rightConcept}`);
+}
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -370,9 +474,17 @@ io.on('connection', (socket) => {
 
     room.isGameStarted = true;
     
-    // Generate initial game state with a spectrum concept
-    const currentCard = getConceptForGame(gameConfig, 0);
     const connectedPlayers = room.players.filter(p => p.isConnected);
+    let initialPhase = 'psychic';
+    let currentCard = null;
+    
+    // For custom mode, start with voting phase
+    if (gameConfig.mode === 'custom' && room.customPrompts && room.customPrompts.length > 0) {
+      initialPhase = 'prompt-voting';
+    } else {
+      // For normal mode, generate initial card
+      currentCard = getConceptForGame(gameConfig, 0);
+    }
     
     room.gameState = {
       ...gameConfig,
@@ -380,15 +492,18 @@ io.on('connection', (socket) => {
       currentPsychicIndex: 0, // First player is psychic
       currentCard: currentCard,
       targetPosition: Math.random() * 100, // Random target position (0-100)
-      targetWidth: Math.floor(Math.random() * 20) + 15, // Random width 15-35
+      targetWidth: 25, // Total target area is 25% of spectrum (containing all scoring zones)
       dialPosition: 50, // Initial dial position at center
-      gamePhase: 'psychic',
+      gamePhase: initialPhase,
       psychicClue: '',
       currentRound: 1,
       totalRounds: 8, // Default 8 rounds
       totalScore: 0,
       roundScores: [],
-      currentPromptIndex: 0 // Track current prompt index for custom games
+      currentPromptIndex: 0, // Track current prompt index for custom games
+      promptVotes: [],
+      votingTimeLeft: 10,
+      customPrompts: room.customPrompts ? getCustomPromptsAsConcepts(room.customPrompts) : undefined
     };
 
     io.to(room.code).emit('game-started', {
@@ -396,7 +511,12 @@ io.on('connection', (socket) => {
       gameState: room.gameState,
     });
 
-    console.log(`Game started: ${room.code} with concept: ${currentCard.leftConcept} - ${currentCard.rightConcept}`);
+    // If we're starting with voting, start the voting timer
+    if (initialPhase === 'prompt-voting') {
+      startVotingTimer(room.code);
+    }
+
+    console.log(`Game started: ${room.code} in ${initialPhase} phase`);
   });
 
   // Update game state
@@ -405,6 +525,14 @@ io.on('connection', (socket) => {
     const room = gameRooms.get(gameCode);
 
     if (!room) return;
+
+    // During prompt-voting phase, preserve existing promptVotes if incoming state doesn't have them
+    if (room.gameState && room.gameState.gamePhase === 'prompt-voting' && 
+        gameState.promptVotes === undefined && room.gameState.promptVotes) {
+      console.log('SERVER: Preserving promptVotes during voting phase');
+      console.log('SERVER: Existing votes:', JSON.stringify(room.gameState.promptVotes, null, 2));
+      gameState.promptVotes = room.gameState.promptVotes;
+    }
 
     room.gameState = gameState;
     
@@ -448,27 +576,177 @@ io.on('connection', (socket) => {
 
     if (!room || !room.gameState) return;
 
-    // Increment prompt index and get next concept
-    const nextPromptIndex = (room.gameState.currentPromptIndex || 0) + 1;
-    const newCard = getConceptForGame(room.gameState, nextPromptIndex);
-    const newTargetPosition = Math.random() * 100;
+    // Check if game should end (using the incremented round number)
+    const nextRound = room.gameState.currentRound + 1;
+    const totalRounds = room.gameState.totalRounds || 8;
     
-    // Update room game state
-    room.gameState.currentCard = newCard;
-    room.gameState.targetPosition = newTargetPosition;
+    if (nextRound > totalRounds) {
+      // Game should end
+      room.gameState.gamePhase = 'ended';
+      io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
+      console.log(`Game ${room.code} ended after ${room.gameState.currentRound} rounds`);
+      return;
+    }
+
+    // Increment round
+    room.gameState.currentRound = nextRound;
     room.gameState.dialPosition = 50; // Reset dial to center
     room.gameState.psychicClue = ''; // Reset clue
-    room.gameState.currentRound += 1;
-    room.gameState.currentPromptIndex = nextPromptIndex;
+    room.gameState.promptVotes = []; // Reset votes
+    
+    // For custom mode, start voting phase
+    if (room.gameState.mode === 'custom' && room.customPrompts && room.customPrompts.length > 0) {
+      room.gameState.gamePhase = 'prompt-voting';
+      room.gameState.votingTimeLeft = 10;
+      
+      // Broadcast the new round with voting phase
+      io.to(room.code).emit('new-round-voting', {
+        currentRound: room.gameState.currentRound,
+        gameState: room.gameState
+      });
+      
+      // Start voting timer
+      startVotingTimer(room.code);
+      
+      console.log(`New round ${room.gameState.currentRound} voting started for game ${room.code}`);
+    } else {
+      // For normal mode, generate next concept
+      const nextPromptIndex = (room.gameState.currentPromptIndex || 0) + 1;
+      const newCard = getConceptForGame(room.gameState, nextPromptIndex);
+      const newTargetPosition = Math.random() * 100;
+      
+      // Update room game state
+      room.gameState.currentCard = newCard;
+      room.gameState.targetPosition = newTargetPosition;
+      room.gameState.targetWidth = 25; // Total target area is 25% of spectrum (containing all scoring zones)
+      room.gameState.currentPromptIndex = nextPromptIndex;
+      room.gameState.gamePhase = 'psychic';
 
-    // Broadcast the new round data to all players
-    io.to(room.code).emit('new-round-data', {
-      currentCard: newCard,
-      targetPosition: newTargetPosition,
-      currentRound: room.gameState.currentRound
+      // Broadcast the new round data to all players
+      io.to(room.code).emit('new-round-data', {
+        currentCard: newCard,
+        targetPosition: newTargetPosition,
+        currentRound: room.gameState.currentRound
+      });
+
+      console.log(`New round started for game ${room.code}: ${newCard.leftConcept} - ${newCard.rightConcept}`);
+    }
+  });
+
+  // Handle prompt voting
+  socket.on('vote-prompt', (data) => {
+    const { gameCode, promptId, playerId } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || !room.gameState || room.gameState.gamePhase !== 'prompt-voting') return;
+
+    // Initialize promptVotes array if it doesn't exist
+    if (!room.gameState.promptVotes) {
+      room.gameState.promptVotes = [];
+    }
+
+    // Find existing vote from this player
+    const existingVoteIndex = room.gameState.promptVotes.findIndex(vote => vote.playerId === playerId);
+    
+    if (existingVoteIndex >= 0) {
+      // Update existing vote
+      if (promptId && promptId.trim() !== '') {
+        room.gameState.promptVotes[existingVoteIndex] = {
+          playerId: playerId,
+          promptId: promptId,
+          isLockedIn: false // Reset lock-in when changing vote
+        };
+      } else {
+        // Remove vote if no promptId provided
+        room.gameState.promptVotes.splice(existingVoteIndex, 1);
+      }
+    } else {
+      // Add new vote if promptId is provided
+      if (promptId && promptId.trim() !== '') {
+        room.gameState.promptVotes.push({
+          playerId: playerId,
+          promptId: promptId,
+          isLockedIn: false
+        });
+      }
+    }
+
+    // Debug: Log final vote state
+    console.log(`=== FINAL VOTE STATE AFTER ${playerId} VOTED ===`);
+    console.log('All votes:', JSON.stringify(room.gameState.promptVotes, null, 2));
+    console.log('Vote counts by prompt:');
+    const voteCounts = {};
+    room.gameState.promptVotes.forEach(vote => {
+      if (vote.promptId && vote.promptId !== '') {
+        voteCounts[vote.promptId] = (voteCounts[vote.promptId] || 0) + 1;
+      }
+    });
+    console.log(JSON.stringify(voteCounts, null, 2));
+
+    // Broadcast vote update to all players
+    io.to(room.code).emit('vote-updated', {
+      promptVotes: room.gameState.promptVotes
     });
 
-    console.log(`New round started for game ${room.code}: ${newCard.leftConcept} - ${newCard.rightConcept}`);
+    console.log(`Player ${playerId} voted for prompt ${promptId} in game ${room.code}. Total votes: ${room.gameState.promptVotes.length}`);
+  });
+
+  // Handle lock in vote
+  socket.on('lock-in-vote', (data) => {
+    const { gameCode, playerId } = data;
+    const room = gameRooms.get(gameCode);
+
+    if (!room || !room.gameState || room.gameState.gamePhase !== 'prompt-voting') return;
+
+    // Initialize promptVotes array if it doesn't exist
+    if (!room.gameState.promptVotes) {
+      room.gameState.promptVotes = [];
+    }
+
+    console.log(`=== LOCK-IN DEBUG: Player ${playerId} locking in ===`);
+    console.log('Before lock-in, all votes:', JSON.stringify(room.gameState.promptVotes, null, 2));
+    
+    // Find and update player's vote to locked in
+    const voteIndex = room.gameState.promptVotes.findIndex(v => v.playerId === playerId);
+    console.log(`Found vote at index: ${voteIndex}`);
+    
+    if (voteIndex >= 0) {
+      // Player has an existing vote - lock it in
+      console.log('Existing vote found:', JSON.stringify(room.gameState.promptVotes[voteIndex], null, 2));
+      room.gameState.promptVotes[voteIndex].isLockedIn = true;
+      console.log('After locking in:', JSON.stringify(room.gameState.promptVotes[voteIndex], null, 2));
+    } else {
+      // Player locked in without voting (abstain)
+      console.log('No existing vote found, creating abstain vote');
+      room.gameState.promptVotes.push({
+        playerId: playerId,
+        promptId: '', // Empty means abstain
+        isLockedIn: true
+      });
+    }
+    
+    console.log('After lock-in, all votes:', JSON.stringify(room.gameState.promptVotes, null, 2));
+
+    // Check if all players are locked in
+    const connectedPlayers = room.players.filter(p => p.isConnected);
+    const lockedInVotes = room.gameState.promptVotes.filter(v => v.isLockedIn);
+    
+    if (lockedInVotes.length >= connectedPlayers.length) {
+      // All players locked in - finish voting early
+      const timer = votingTimers.get(gameCode);
+      if (timer) {
+        clearInterval(timer);
+        votingTimers.delete(gameCode);
+      }
+      finishVoting(gameCode);
+    } else {
+      // Broadcast lock in update
+      io.to(room.code).emit('vote-updated', {
+        promptVotes: room.gameState.promptVotes
+      });
+    }
+
+    console.log(`Player ${playerId} locked in vote for game ${room.code}. Total votes: ${room.gameState.promptVotes.length}`);
   });
 
   // Handle custom prompt submission

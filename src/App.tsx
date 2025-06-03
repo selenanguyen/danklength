@@ -4,6 +4,7 @@ import { useSocket } from './hooks/useSocket';
 import { GameSetup } from './components/GameSetup/GameSetup';
 import { PlayerSetup } from './components/PlayerSetup/PlayerSetup';
 import { MultiplayerLobby } from './components/MultiplayerLobby/MultiplayerLobby';
+import { PromptVoting } from './components/PromptVoting/PromptVoting';
 import { SpectrumCard } from './components/SpectrumCard/SpectrumCard';
 import { Dial } from './components/Dial/Dial';
 import type { GameConfig } from './types';
@@ -21,10 +22,14 @@ function App() {
     updateDialPosition,
     calculateScore,
     syncGameState,
+    lockInGuess,
+    updateGuessVotePosition,
+    checkAllPlayersLockedIn,
+    lockInRemotePlayerGuess,
   } = useGameState();
 
   const socketInstance = useSocket();
-  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction } = socketInstance;
+  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction, voteForPrompt, lockInVote, nextRound } = socketInstance;
 
   const [clueInput, setClueInput] = useState('');
   const [playMode, setPlayMode] = useState<'local' | 'remote' | null>(null);
@@ -51,7 +56,11 @@ function App() {
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase !== 'setup') {
       console.log('Host syncing game state:', gameState);
-      updateGameState(gameState);
+      // Don't sync promptVotes during voting phase - those are managed by voting system
+      const stateToSync = gameState.gamePhase === 'prompt-voting' 
+        ? { ...gameState, promptVotes: undefined }
+        : gameState;
+      updateGameState(stateToSync);
     }
   }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, gameState.psychicClue, updateGameState]);
 
@@ -78,13 +87,24 @@ function App() {
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.isHost) {
       const handlePlayerAction = (...args: unknown[]) => {
-        const eventData = args[0] as { playerId: string; action: string; data: { position?: number; clue?: string } };
+        const eventData = args[0] as { playerId: string; action: string; data: { position?: number; clue?: string; allPlayersReady?: boolean } };
         console.log('=== HOST RECEIVED PLAYER ACTION ===');
         console.log('Player action data:', eventData);
         
         if (eventData.action === 'lock-in-guess' && eventData.data.position !== undefined) {
           console.log('HOST: Processing lock-in-guess from player:', eventData.playerId, 'at position:', eventData.data.position);
-          submitGuess(eventData.data.position);
+          
+          // Get player name from socket players
+          const player = multiplayerState.players.find(p => p.id === eventData.playerId);
+          if (!player) return;
+          
+          // Lock in this remote player's guess and check if all are ready
+          lockInRemotePlayerGuess(eventData.playerId, player.name, eventData.data.position).then((allLockedIn) => {
+            if (allLockedIn || eventData.data.allPlayersReady) {
+              console.log('HOST: All players locked in, submitting guess at position:', gameState.dialPosition);
+              submitGuess(gameState.dialPosition);
+            }
+          });
         } else if (eventData.action === 'submit-clue' && eventData.data.clue !== undefined) {
           console.log('HOST: Processing submit-clue from player:', eventData.playerId, 'clue:', eventData.data.clue);
           submitClue(eventData.data.clue);
@@ -154,39 +174,79 @@ function App() {
   };
 
   const handleSubmitGuess = () => {
-    console.log('=== HANDLE SUBMIT GUESS CALLED ===');
-    console.log('Current game state:', {
-      phase: gameState.gamePhase,
-      round: gameState.currentRound,
-      totalRounds: gameState.totalRounds,
-      dialPosition: gameState.dialPosition,
-      playMode,
-      isHost: multiplayerState.isHost
-    });
+    console.log('=== HANDLE SUBMIT GUESS (LOCK IN) CALLED ===');
+    
+    // Get current player info
+    let currentPlayerId: string;
+    let currentPlayerName: string;
     
     if (playMode === 'remote') {
-      if (multiplayerState.isHost) {
-        // Host handles guess submission and scoring
-        console.log('Host submitting guess at position:', gameState.dialPosition);
-        submitGuess(gameState.dialPosition);
+      const currentMultiplayerPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
+      if (!currentMultiplayerPlayer) return;
+      currentPlayerId = currentMultiplayerPlayer.id;
+      currentPlayerName = currentMultiplayerPlayer.name;
+    } else {
+      // For local mode, we need to determine which player is currently guessing
+      // In local mode, all non-psychic players can vote
+      currentPlayerId = 'local-guesser';
+      currentPlayerName = 'Local Players';
+    }
+    
+    // Lock in this player's guess
+    lockInGuess(currentPlayerId, currentPlayerName);
+    
+    // Check if all players are now locked in
+    const updatedVotes = [...(gameState.guessVotes || [])];
+    const existingVoteIndex = updatedVotes.findIndex(vote => vote.playerId === currentPlayerId);
+    if (existingVoteIndex >= 0) {
+      updatedVotes[existingVoteIndex] = {
+        ...updatedVotes[existingVoteIndex],
+        isLockedIn: true,
+        dialPosition: gameState.dialPosition,
+      };
+    } else {
+      updatedVotes.push({
+        playerId: currentPlayerId,
+        playerName: currentPlayerName,
+        isLockedIn: true,
+        dialPosition: gameState.dialPosition,
+      });
+    }
+    
+    // Check if all non-psychic players have locked in
+    const allLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, updatedVotes);
+    
+    if (allLockedIn || playMode === 'local') {
+      // All players locked in or local mode - submit the guess
+      console.log('All players locked in, submitting guess at position:', gameState.dialPosition);
+      
+      if (playMode === 'remote') {
+        if (multiplayerState.isHost) {
+          // Host submits the guess
+          submitGuess(gameState.dialPosition);
+        } else {
+          // Non-host sends lock-in action to host
+          sendPlayerAction('lock-in-guess', { position: gameState.dialPosition, allPlayersReady: true });
+        }
       } else {
-        // Non-host: emit a "lock-in-guess" event to the host
-        console.log('Non-host locking in guess at position:', gameState.dialPosition);
-        console.log('Sending lock-in-guess action to host...');
-        sendPlayerAction('lock-in-guess', { position: gameState.dialPosition });
+        // Local mode - submit immediately
+        submitGuess(gameState.dialPosition);
       }
     } else {
-      // In local mode, submit guess and calculate score immediately
-      console.log('Local mode: submitting guess at position:', gameState.dialPosition);
-      submitGuess(gameState.dialPosition);
+      console.log('Waiting for other players to lock in their guesses...');
+      
+      if (playMode === 'remote' && !multiplayerState.isHost) {
+        // Send lock-in event to other players
+        sendPlayerAction('lock-in-guess', { position: gameState.dialPosition });
+      }
     }
   };
 
   const handleNextRound = () => {
     if (playMode === 'remote') {
-      // In multiplayer, only the host should start new rounds and sync
+      // In multiplayer, only the host should start new rounds and emit to server
       if (multiplayerState.isHost) {
-        startNewRound();
+        nextRound();
       }
     } else {
       // In local mode, anyone can advance
@@ -194,11 +254,6 @@ function App() {
     }
   };
 
-  const handleFinishGame = () => {
-    // This should not be needed anymore since submitGuess automatically 
-    // transitions to 'ended' when currentRound >= totalRounds
-    console.log('handleFinishGame called - this should not happen');
-  };
 
   // Welcome screen
   if (gameState.gamePhase === 'setup' && playMode === null) {
@@ -232,6 +287,28 @@ function App() {
     return (
       <div className="game-container compact">
         <PlayerSetup onStartGame={handlePlayerSetup} onBackToMain={handleBackToWelcome} />
+      </div>
+    );
+  }
+
+  // Prompt voting phase (custom mode only)
+  if (gameState.gamePhase === 'prompt-voting') {
+    const customPrompts = gameState.customPrompts || [];
+    const promptVotes = playMode === 'remote' ? multiplayerState.promptVotes : (gameState.promptVotes || []);
+    const votingTimeLeft = playMode === 'remote' ? multiplayerState.votingTimeLeft : (gameState.votingTimeLeft || 0);
+    const currentPlayerId = playMode === 'remote' ? (multiplayerState.currentPlayerId || '') : 'local-player';
+
+    return (
+      <div className="game-container full-height">
+        <PromptVoting
+          customPrompts={customPrompts}
+          promptVotes={promptVotes}
+          votingTimeLeft={votingTimeLeft}
+          currentPlayerId={currentPlayerId}
+          onVotePrompt={voteForPrompt}
+          onLockIn={lockInVote}
+          currentRound={gameState.currentRound}
+        />
       </div>
     );
   }
@@ -370,13 +447,38 @@ function App() {
         onPositionChange={(position) => {
           // Update local position
           updateDialPosition(position);
+          
+          // Handle guess vote tracking
+          if (gameState.gamePhase === 'guessing') {
+            let currentPlayerId: string;
+            let currentPlayerName: string;
+            
+            if (playMode === 'remote') {
+              const currentMultiplayerPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
+              if (currentMultiplayerPlayer) {
+                currentPlayerId = currentMultiplayerPlayer.id;
+                currentPlayerName = currentMultiplayerPlayer.name;
+                
+                // Update this player's vote position and unlock if they were locked in
+                updateGuessVotePosition(currentPlayerId, currentPlayerName, position);
+              }
+            } else {
+              // For local mode, track position for all guessers
+              currentPlayerId = 'local-guesser';
+              currentPlayerName = 'Local Players';
+              updateGuessVotePosition(currentPlayerId, currentPlayerName, position);
+            }
+          }
+          
           // Send to other players in multiplayer mode
           if (playMode === 'remote') {
             const { updateDialPosition: sendDialUpdate } = socketInstance;
             sendDialUpdate(position);
           }
         }}
-        disabled={gameState.gamePhase === 'scoring' || (gameState.gamePhase === 'guessing' && isCurrentPlayerPsychic)}
+        disabled={gameState.gamePhase === 'scoring' || 
+                  (gameState.gamePhase === 'guessing' && isCurrentPlayerPsychic) ||
+                  (gameState.gamePhase === 'guessing' && checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []))}
         hidePointer={false}
         hideForNonPsychic={gameState.gamePhase === 'psychic' && !isCurrentPlayerPsychic}
         isPsychicPhase={gameState.gamePhase === 'psychic' && isCurrentPlayerPsychic}
@@ -421,6 +523,29 @@ function App() {
           <div className="guessing-phase">
             <h3>🎯 Team Guessing</h3>
             <p><strong>Clue:</strong> "{gameState.psychicClue}"</p>
+            
+            {/* Show voting status for multiplayer */}
+            {playMode === 'remote' && gameState.guessVotes && gameState.guessVotes.length > 0 && (
+              <div className="voting-status">
+                <h4>Player Status:</h4>
+                <div className="player-votes">
+                  {gameState.players
+                    .filter((_, index) => index !== gameState.currentPsychicIndex)
+                    .map((player) => {
+                      const vote = gameState.guessVotes?.find(v => 
+                        gameState.players.find(p => p.name === player.name && 
+                          (v.playerId === multiplayerState.players.find(mp => mp.name === p.name)?.id || v.playerId.includes(p.name)))
+                      );
+                      return (
+                        <div key={player.id} className={`player-vote-status ${vote?.isLockedIn ? 'locked-in' : 'waiting'}`}>
+                          {player.name}: {vote?.isLockedIn ? '✅ Locked In' : '⏳ Thinking...'}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+            
             {isCurrentPlayerPsychic ? (
               <p>Watch your team work together to guess the target position! You can see live updates as they move the dial.</p>
             ) : (
@@ -428,9 +553,42 @@ function App() {
                 <p>Work together to position the dial where you think the target is! 
                    {playMode === 'remote' && ' All players can move the dial simultaneously - work together!'}
                 </p>
-                <button className="action-button" onClick={handleSubmitGuess}>
-                  Lock In Guess
-                </button>
+                
+                {(() => {
+                  // Check if current player is locked in
+                  let currentPlayerId = '';
+                  if (playMode === 'remote') {
+                    const currentMultiplayerPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
+                    currentPlayerId = currentMultiplayerPlayer?.id || '';
+                  } else {
+                    currentPlayerId = 'local-guesser';
+                  }
+                  
+                  const currentPlayerVote = gameState.guessVotes?.find(vote => vote.playerId === currentPlayerId);
+                  const isLockedIn = currentPlayerVote?.isLockedIn || false;
+                  const allPlayersLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []);
+                  
+                  if (allPlayersLockedIn) {
+                    return <p>🔒 All players have locked in their guesses! Calculating score...</p>;
+                  } else if (isLockedIn) {
+                    return (
+                      <>
+                        <p>✅ You've locked in your guess! Waiting for other players...</p>
+                        <p><em>Move the dial to unlock and change your guess.</em></p>
+                      </>
+                    );
+                  } else {
+                    return (
+                      <button 
+                        className="action-button" 
+                        onClick={handleSubmitGuess}
+                        disabled={allPlayersLockedIn}
+                      >
+                        Lock In Guess
+                      </button>
+                    );
+                  }
+                })()}
               </>
             )}
           </div>
@@ -453,22 +611,12 @@ function App() {
               );
             })()}
             
-            {gameState.currentRound < gameState.totalRounds ? (
-              playMode === 'local' || multiplayerState.isHost ? (
-                <button className="action-button" onClick={handleNextRound}>
-                  Next Round
-                </button>
-              ) : (
-                <p>Waiting for host to start next round...</p>
-              )
+            {playMode === 'local' || multiplayerState.isHost ? (
+              <button className="action-button" onClick={handleNextRound}>
+                {gameState.currentRound < gameState.totalRounds ? 'Next Round' : 'Finish Game'}
+              </button>
             ) : (
-              playMode === 'local' || multiplayerState.isHost ? (
-                <button className="action-button" onClick={handleFinishGame}>
-                  Finish Game
-                </button>
-              ) : (
-                <p>Waiting for host to finish game...</p>
-              )
+              <p>{gameState.currentRound < gameState.totalRounds ? 'Waiting for host to start next round...' : 'Waiting for host to finish game...'}</p>
             )}
           </div>
         )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, GameConfig, Player } from '../types';
+import type { GameState, GameConfig, Player, PromptVote } from '../types';
 import { config } from '../config';
 
 // Socket event interfaces for documentation
@@ -30,6 +30,8 @@ export interface MultiplayerState {
   syncedGameState: Partial<GameState> | null;
   sharedPrompts: string[];
   sharedGameMode: 'normal' | 'custom' | null;
+  promptVotes: PromptVote[];
+  votingTimeLeft: number;
 }
 
 const initialState: MultiplayerState = {
@@ -44,6 +46,8 @@ const initialState: MultiplayerState = {
   syncedGameState: null,
   sharedPrompts: [],
   sharedGameMode: null,
+  promptVotes: [],
+  votingTimeLeft: 0,
 };
 
 // Helper functions for localStorage cache
@@ -294,6 +298,63 @@ export const useSocket = () => {
       }));
     });
 
+    // Voting events
+    socket.on('new-round-voting', (data) => {
+      console.log('New round voting started:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        syncedGameState: data.gameState,
+        promptVotes: [],
+        votingTimeLeft: 10,
+      }));
+    });
+
+    socket.on('vote-updated', (data) => {
+      console.log('CLIENT SOCKET: Votes updated received');
+      console.log('CLIENT SOCKET: Raw data:', JSON.stringify(data, null, 2));
+      console.log('CLIENT SOCKET: promptVotes array:', JSON.stringify(data.promptVotes, null, 2));
+      setMultiplayerState(prev => {
+        console.log('CLIENT SOCKET: Previous votes:', JSON.stringify(prev.promptVotes, null, 2));
+        console.log('CLIENT SOCKET: New votes:', JSON.stringify(data.promptVotes, null, 2));
+        return {
+          ...prev,
+          promptVotes: data.promptVotes,
+        };
+      });
+    });
+
+    socket.on('voting-time-update', (data) => {
+      setMultiplayerState(prev => ({
+        ...prev,
+        votingTimeLeft: data.timeLeft,
+      }));
+    });
+
+    socket.on('voting-finished', (data) => {
+      console.log('Voting finished:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        syncedGameState: data.gameState,
+        promptVotes: [],
+        votingTimeLeft: 0,
+      }));
+    });
+
+    // Handle new round events from server
+    socket.on('new-round-data', (data) => {
+      console.log('New round data received:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        syncedGameState: {
+          ...prev.syncedGameState,
+          currentCard: data.currentCard,
+          targetPosition: data.targetPosition,
+          currentRound: data.currentRound,
+          gamePhase: 'psychic',
+        },
+      }));
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -422,6 +483,33 @@ export const useSocket = () => {
     }
   };
 
+  const voteForPrompt = (promptId: string) => {
+    if (socketRef.current && multiplayerState.gameCode && multiplayerState.currentPlayerId) {
+      socketRef.current.emit('vote-prompt', {
+        gameCode: multiplayerState.gameCode,
+        promptId,
+        playerId: multiplayerState.currentPlayerId,
+      });
+    }
+  };
+
+  const lockInVote = () => {
+    if (socketRef.current && multiplayerState.gameCode && multiplayerState.currentPlayerId) {
+      socketRef.current.emit('lock-in-vote', {
+        gameCode: multiplayerState.gameCode,
+        playerId: multiplayerState.currentPlayerId,
+      });
+    }
+  };
+
+  const nextRound = () => {
+    if (socketRef.current && multiplayerState.gameCode) {
+      socketRef.current.emit('next-round', {
+        gameCode: multiplayerState.gameCode,
+      });
+    }
+  };
+
   return {
     multiplayerState,
     createGame,
@@ -439,5 +527,8 @@ export const useSocket = () => {
     updateGameMode,
     addEventListener,
     removeEventListener,
+    voteForPrompt,
+    lockInVote,
+    nextRound,
   };
 };

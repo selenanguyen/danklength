@@ -11,6 +11,19 @@ export interface Player {
   isHost?: boolean;
 }
 
+export interface PromptVote {
+  playerId: string;
+  promptId: string;
+  isLockedIn: boolean;
+}
+
+export interface GuessVote {
+  playerId: string;
+  playerName: string;
+  isLockedIn: boolean;
+  dialPosition: number;
+}
+
 export interface GameState {
   gameId?: string;
   gameMode: 'normal' | 'custom';
@@ -20,7 +33,7 @@ export interface GameState {
   targetPosition: number;
   targetWidth: number;
   dialPosition: number;
-  gamePhase: 'setup' | 'player-setup' | 'psychic' | 'guessing' | 'scoring' | 'ended';
+  gamePhase: 'setup' | 'player-setup' | 'prompt-voting' | 'psychic' | 'guessing' | 'scoring' | 'ended';
   psychicClue: string;
   currentRound: number;
   totalRounds: number;
@@ -29,6 +42,10 @@ export interface GameState {
   customPrompts?: SpectrumConcept[];
   currentPromptIndex?: number;
   currentPromptUse?: number;
+  promptVotes?: PromptVote[];
+  votingTimeLeft?: number;
+  selectedPromptForRound?: SpectrumConcept;
+  guessVotes?: GuessVote[];
 }
 
 export interface GameConfig {

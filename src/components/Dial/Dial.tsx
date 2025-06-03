@@ -4,7 +4,7 @@ import './Dial.css';
 interface DialProps {
   position: number;
   targetPosition?: number;
-  targetWidth?: number;
+  targetWidth?: number; // Received but not used - we use fixed 25% for consistency
   showTarget?: boolean;
   onPositionChange: (position: number) => void;
   disabled?: boolean;
@@ -17,7 +17,7 @@ interface DialProps {
 export const Dial: React.FC<DialProps> = ({
   position,
   targetPosition,
-  targetWidth: _targetWidth = 20, // Renamed to indicate it's intentionally unused
+  targetWidth: _targetWidth, // Received but not used - we use fixed 25% for consistency
   showTarget = false,
   onPositionChange,
   disabled = false,
@@ -133,41 +133,45 @@ export const Dial: React.FC<DialProps> = ({
     console.log('Target position:', targetPosition, 'Show target:', showTarget);
     
     let center = targetPosition;
-    const halfWidth = 35 / 2; // VISUAL ONLY: Display size (can be adjusted for better UX without affecting scoring)
+    const totalTargetWidth = 25; // Fixed 25% width - must match useGameState exactly
+    const halfWidth = totalTargetWidth / 2; // 12.5% on each side of center
     
     // Calculate the full target range
     const leftEdge = center - halfWidth;
     const rightEdge = center + halfWidth;
     
     // If only a small portion would wrap, adjust the center to avoid wrapping
-    const wrapThreshold = halfWidth * 0.15; // 15% of target width
+    const wrapThreshold = halfWidth * 0.15; // 15% of target width (match useGameState exactly)
     
     if (leftEdge < 0 && Math.abs(leftEdge) < wrapThreshold) {
       // Small overhang on left - shift right to keep everything visible
       center = halfWidth;
-      console.log('Target adjusted left to right:', targetPosition, '→', center);
+      console.log('DIAL: Target adjusted left to right:', targetPosition, '→', center);
     } else if (rightEdge > 100 && (rightEdge - 100) < wrapThreshold) {
       // Small overhang on right - shift left to keep everything visible  
       center = 100 - halfWidth;
-      console.log('Target adjusted right to left:', targetPosition, '→', center);
+      console.log('DIAL: Target adjusted right to left:', targetPosition, '→', center);
+    } else {
+      console.log('DIAL: Target not adjusted:', targetPosition);
     }
     
-    // Create 5 zones with slightly forgiving proportions for higher-value zones (match scoring exactly)
-    const centerWidth = halfWidth / 4.5;      // Blue center: slightly larger (4 points)
-    const innerWidth = halfWidth / 4.8;       // Purple zones: slightly larger (3 points)
-    const outerWidth = halfWidth / 5.5;       // Red zones: smaller (2 points)
+    // Match the exact scoring logic from useGameState - equal zones
+    const zoneWidth = 5; // 5% per zone (same as scoring logic)
+    const centerZone = zoneWidth / 2;                 // Center: 2.5% from center (4 points)
+    const innerZone = centerZone + zoneWidth;         // Inner: extends to 7.5% from center (3 points) 
+    const outerZone = centerZone + (zoneWidth * 2);   // Outer: extends to 12.5% from center (2 points)
     
-    // Calculate zone boundaries (allow negative and >100 values)
-    const leftOuterStart = center - centerWidth/2 - innerWidth - outerWidth;
-    const leftOuterEnd = center - centerWidth/2 - innerWidth;
-    const leftInnerStart = leftOuterEnd;
-    const leftInnerEnd = center - centerWidth/2;
-    const centerStart = center - centerWidth/2;
-    const centerEnd = center + centerWidth/2;
-    const rightInnerStart = centerEnd;
-    const rightInnerEnd = center + centerWidth/2 + innerWidth;
-    const rightOuterStart = rightInnerEnd;
-    const rightOuterEnd = center + centerWidth/2 + innerWidth + outerWidth;
+    // Calculate zone boundaries from center outward (allow negative and >100 values)
+    const centerStart = center - centerZone;
+    const centerEnd = center + centerZone;
+    const leftInnerStart = center - innerZone;
+    const leftInnerEnd = center - centerZone;
+    const rightInnerStart = center + centerZone;
+    const rightInnerEnd = center + innerZone;
+    const leftOuterStart = center - outerZone;
+    const leftOuterEnd = center - innerZone;
+    const rightOuterStart = center + innerZone;
+    const rightOuterEnd = center + outerZone;
     
     // Clamp only when converting to angles to keep zones visible on semicircle
     const clampAndConvert = (percent: number) => {

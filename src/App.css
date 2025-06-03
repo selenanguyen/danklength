@@ -437,3 +437,53 @@
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   }
 }
+
+/* Voting Status Styles */
+.voting-status {
+  margin: 20px 0;
+  padding: 15px;
+  background: linear-gradient(145deg, #f0f8ff 0%, #e6f3ff 100%);
+  border: 2px solid var(--tama-blue);
+  border-radius: 15px;
+  box-shadow: 0 4px 8px var(--tama-shadow);
+}
+
+.voting-status h4 {
+  margin: 0 0 10px 0;
+  color: var(--tama-dark);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.player-votes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.player-vote-status {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.player-vote-status.locked-in {
+  background: linear-gradient(145deg, #d4edda 0%, #c3e6cb 100%);
+  border: 2px solid #28a745;
+  color: #155724;
+}
+
+.player-vote-status.waiting {
+  background: linear-gradient(145deg, #fff3cd 0%, #ffeeba 100%);
+  border: 2px solid #ffc107;
+  color: #856404;
+}
+
+/* Lock-in status messages */
+.guessing-phase p em {
+  color: var(--tama-purple);
+  font-style: italic;
+  font-size: 14px;
+}

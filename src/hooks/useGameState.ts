@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { GameState, GameConfig, Player, SpectrumConcept, ScoreResult } from '../types';
+import type { GameState, GameConfig, Player, SpectrumConcept, ScoreResult, GuessVote } from '../types';
 import { getRandomConcept } from '../data/spectrumConcepts';
 
 const initialGameState: GameState = {
@@ -8,7 +8,7 @@ const initialGameState: GameState = {
   currentPsychicIndex: 0,
   currentCard: null,
   targetPosition: 50,
-  targetWidth: 20,
+  targetWidth: 25,
   dialPosition: 50,
   gamePhase: 'setup',
   psychicClue: '',
@@ -16,6 +16,7 @@ const initialGameState: GameState = {
   totalRounds: 0,
   totalScore: 0,
   roundScores: [],
+  guessVotes: [],
 };
 
 export const useGameState = () => {
@@ -26,7 +27,7 @@ export const useGameState = () => {
   }, []);
 
   const generateTargetWidth = useCallback((): number => {
-    return Math.floor(Math.random() * 20) + 15; // 15-35 width
+    return 25; // Fixed 25% width for consistent target size
   }, []);
 
   const initializeGame = useCallback((config: GameConfig) => {
@@ -65,34 +66,44 @@ export const useGameState = () => {
     setGameState(prev => {
       const { gameMode, customPrompts, currentRound, totalRounds, players } = prev;
       
-      // Check if game should end
-      if (currentRound >= totalRounds) {
+      // Check if game should end (using the incremented round number)
+      const nextRound = currentRound + 1;
+      if (nextRound > totalRounds) {
         return { ...prev, gamePhase: 'ended' };
       }
 
-      // Select card based on game mode
-      let card: SpectrumConcept;
-      if (gameMode === 'custom' && customPrompts && customPrompts.length > 0) {
-        const promptIndex = Math.floor(currentRound / Math.ceil(totalRounds / customPrompts.length));
-        card = customPrompts[promptIndex] || customPrompts[0];
-      } else {
-        card = getRandomConcept();
-      }
-      
       const target = generateTarget();
       const targetWidth = generateTargetWidth();
       
-      return {
-        ...prev,
-        currentCard: card,
-        targetPosition: target,
-        targetWidth,
-        dialPosition: 50,
-        gamePhase: 'psychic',
-        psychicClue: '',
-        currentRound: prev.currentRound + 1,
-        currentPsychicIndex: players.length > 0 ? (prev.currentPsychicIndex + 1) % players.length : 0,
-      };
+      // For custom mode, go to voting phase first
+      if (gameMode === 'custom' && customPrompts && customPrompts.length > 0) {
+        return {
+          ...prev,
+          targetPosition: target,
+          targetWidth,
+          dialPosition: 50,
+          gamePhase: 'prompt-voting',
+          psychicClue: '',
+          currentRound: nextRound,
+          currentPsychicIndex: players.length > 0 ? (prev.currentPsychicIndex + 1) % players.length : 0,
+          promptVotes: [],
+          votingTimeLeft: 10,
+        };
+      } else {
+        // For normal mode, select random card and go to psychic phase
+        const card = getRandomConcept();
+        return {
+          ...prev,
+          currentCard: card,
+          targetPosition: target,
+          targetWidth,
+          dialPosition: 50,
+          gamePhase: 'psychic',
+          psychicClue: '',
+          currentRound: nextRound,
+          currentPsychicIndex: players.length > 0 ? (prev.currentPsychicIndex + 1) % players.length : 0,
+        };
+      }
     });
   }, [generateTarget, generateTargetWidth]);
 
@@ -104,14 +115,17 @@ export const useGameState = () => {
         ...prev,
         psychicClue: clue,
         gamePhase: 'guessing',
+        dialPosition: 50, // Reset dial to center position for voters
+        guessVotes: [], // Clear any previous guess votes
       };
     });
   }, []);
 
   // Shared function to calculate the adjusted target center (EXACT same logic as Dial component)
-  const getAdjustedTargetCenter = useCallback((targetPos: number, _targetWidth: number) => {
+  const getAdjustedTargetCenter = useCallback((targetPos: number) => {
     let center = targetPos;
-    const halfWidth = 25 / 2; // GAME LOGIC: Fixed 25% - independent of visual rendering size
+    const totalTargetWidth = 25; // Total target area is 25% of spectrum
+    const halfWidth = totalTargetWidth / 2; // 12.5% on each side of center
     
     // Calculate the full target range
     const leftEdge = center - halfWidth;
@@ -141,22 +155,23 @@ export const useGameState = () => {
     
     // IMPORTANT: This uses GAME LOGIC target size (25%), NOT visual display size
     // The visual target in Dial component can be different for better UX
-    const adjustedCenter = getAdjustedTargetCenter(targetPos, targetWidth);
+    const adjustedCenter = getAdjustedTargetCenter(targetPos);
     
     // Calculate distance considering wrapping around the spectrum
     const straightDistance = Math.abs(dialPos - adjustedCenter);
     const wrapAroundDistance = 100 - straightDistance; // Distance going the other way around
     const distance = Math.min(straightDistance, wrapAroundDistance);
     
-    const halfWidth = 25 / 2; // GAME LOGIC: Fixed 25% - independent of visual rendering size
-    const centerWidth = halfWidth / 4.5;      // Blue center: slightly larger (4 points)
-    const innerWidth = halfWidth / 4.8;       // Purple zones: slightly larger (3 points)
-    const outerWidth = halfWidth / 5.5;       // Red zones: smaller (2 points)
+    // Total target area should be 25% of the spectrum
+    const totalTargetWidth = 25; // 25% of the spectrum (0-100)
+    const halfTargetWidth = totalTargetWidth / 2; // 12.5% on each side of center
     
-    // Zone boundaries from center outward (total radius from center)
-    const centerZone = centerWidth / 2;                    // Half of center width
-    const innerZone = centerWidth / 2 + innerWidth;        // Center + one inner zone
-    const outerZone = centerWidth / 2 + innerWidth + outerWidth; // Center + inner + outer
+    // Divide the total target area into 5 equal zones (1 center + 2 inner + 2 outer)
+    // Each zone = 5% of spectrum width
+    const zoneWidth = 5; // 5% per zone
+    const centerZone = zoneWidth / 2;                 // Center: 2.5% from center (4 points)
+    const innerZone = centerZone + zoneWidth;         // Inner: extends to 7.5% from center (3 points) 
+    const outerZone = centerZone + (zoneWidth * 2);   // Outer: extends to 12.5% from center (2 points)
     
     console.log('Score calculation:', {
       dialPos,
@@ -168,7 +183,8 @@ export const useGameState = () => {
       centerZone,
       innerZone,
       outerZone,
-      halfWidth,
+      totalTargetWidth,
+      halfTargetWidth,
       targetWidth,
       wasAdjusted: adjustedCenter !== targetPos
     });
@@ -204,29 +220,15 @@ export const useGameState = () => {
       const newTotalScore = totalScore + result.points;
       const newRoundScores = [...roundScores, result.points];
       
-      // Check if game should end
-      const shouldEnd = currentRound >= totalRounds;
-      console.log('Should game end?', shouldEnd, `(${currentRound} >= ${totalRounds})`);
-      
-      if (shouldEnd) {
-        console.log('Transitioning to ended phase');
-        return {
-          ...prev,
-          dialPosition: position,
-          totalScore: newTotalScore,
-          roundScores: newRoundScores,
-          gamePhase: 'ended',
-        };
-      } else {
-        console.log('Transitioning to scoring phase');
-        return {
-          ...prev,
-          dialPosition: position,
-          totalScore: newTotalScore,
-          roundScores: newRoundScores,
-          gamePhase: 'scoring',
-        };
-      }
+      // Always go to scoring phase first to show the score
+      console.log('Transitioning to scoring phase');
+      return {
+        ...prev,
+        dialPosition: position,
+        totalScore: newTotalScore,
+        roundScores: newRoundScores,
+        gamePhase: 'scoring',
+      };
     });
   }, [calculateScore]);
 
@@ -316,6 +318,132 @@ export const useGameState = () => {
     }));
   }, []);
 
+  const lockInGuess = useCallback((playerId: string, playerName: string) => {
+    setGameState(prev => {
+      const currentVotes = prev.guessVotes || [];
+      const existingVoteIndex = currentVotes.findIndex(vote => vote.playerId === playerId);
+      
+      let newVotes;
+      if (existingVoteIndex >= 0) {
+        // Update existing vote
+        newVotes = [...currentVotes];
+        newVotes[existingVoteIndex] = {
+          ...newVotes[existingVoteIndex],
+          isLockedIn: true,
+          dialPosition: prev.dialPosition,
+        };
+      } else {
+        // Add new vote
+        newVotes = [...currentVotes, {
+          playerId,
+          playerName,
+          isLockedIn: true,
+          dialPosition: prev.dialPosition,
+        }];
+      }
+      
+      return {
+        ...prev,
+        guessVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const unlockGuess = useCallback((playerId: string) => {
+    setGameState(prev => {
+      const currentVotes = prev.guessVotes || [];
+      const newVotes = currentVotes.map(vote => 
+        vote.playerId === playerId 
+          ? { ...vote, isLockedIn: false, dialPosition: prev.dialPosition }
+          : vote
+      );
+      
+      return {
+        ...prev,
+        guessVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const updateGuessVotePosition = useCallback((playerId: string, playerName: string, position: number) => {
+    setGameState(prev => {
+      const currentVotes = prev.guessVotes || [];
+      const existingVoteIndex = currentVotes.findIndex(vote => vote.playerId === playerId);
+      
+      let newVotes;
+      if (existingVoteIndex >= 0) {
+        // Update existing vote
+        newVotes = [...currentVotes];
+        newVotes[existingVoteIndex] = {
+          ...newVotes[existingVoteIndex],
+          isLockedIn: false, // Moving dial unlocks the vote
+          dialPosition: position,
+        };
+      } else {
+        // Add new vote (not locked in initially)
+        newVotes = [...currentVotes, {
+          playerId,
+          playerName,
+          isLockedIn: false,
+          dialPosition: position,
+        }];
+      }
+      
+      return {
+        ...prev,
+        guessVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const checkAllPlayersLockedIn = useCallback((players: Player[], psychicIndex: number, guessVotes: GuessVote[]) => {
+    // Get non-psychic players
+    const nonPsychicPlayers = players.filter((_, index) => index !== psychicIndex);
+    
+    // Check if all non-psychic players have locked in votes
+    const lockedInVotes = guessVotes.filter(vote => vote.isLockedIn);
+    
+    return lockedInVotes.length >= nonPsychicPlayers.length && nonPsychicPlayers.length > 0;
+  }, []);
+
+  const lockInRemotePlayerGuess = useCallback((playerId: string, playerName: string, position: number) => {
+    return new Promise<boolean>((resolve) => {
+      setGameState(prev => {
+        const currentVotes = prev.guessVotes || [];
+        const updatedVotes = [...currentVotes];
+        const existingVoteIndex = updatedVotes.findIndex(vote => vote.playerId === playerId);
+        
+        if (existingVoteIndex >= 0) {
+          updatedVotes[existingVoteIndex] = {
+            ...updatedVotes[existingVoteIndex],
+            isLockedIn: true,
+            dialPosition: position,
+          };
+        } else {
+          updatedVotes.push({
+            playerId,
+            playerName,
+            isLockedIn: true,
+            dialPosition: position,
+          });
+        }
+        
+        // Check if all players are now locked in
+        const allLockedIn = checkAllPlayersLockedIn(prev.players, prev.currentPsychicIndex, updatedVotes);
+        
+        const newState = {
+          ...prev,
+          guessVotes: updatedVotes,
+        };
+        
+        // Resolve the promise with whether all players are locked in
+        setTimeout(() => resolve(allLockedIn), 0);
+        
+        return newState;
+      });
+    });
+  }, [checkAllPlayersLockedIn]);
+
   return {
     gameState,
     initializeGame,
@@ -328,5 +456,10 @@ export const useGameState = () => {
     updateDialPosition,
     calculateScore,
     syncGameState,
+    lockInGuess,
+    unlockGuess,
+    updateGuessVotePosition,
+    checkAllPlayersLockedIn,
+    lockInRemotePlayerGuess,
   };
 };
