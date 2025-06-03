@@ -588,11 +588,17 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Increment round
+    // Increment round and rotate psychic
     room.gameState.currentRound = nextRound;
     room.gameState.dialPosition = 50; // Reset dial to center
     room.gameState.psychicClue = ''; // Reset clue
     room.gameState.promptVotes = []; // Reset votes
+    
+    // Rotate psychic to next player
+    const connectedPlayers = room.players.filter(p => p.isConnected);
+    if (connectedPlayers.length > 0) {
+      room.gameState.currentPsychicIndex = (room.gameState.currentPsychicIndex + 1) % connectedPlayers.length;
+    }
     
     // For custom mode, start voting phase
     if (room.gameState.mode === 'custom' && room.customPrompts && room.customPrompts.length > 0) {
