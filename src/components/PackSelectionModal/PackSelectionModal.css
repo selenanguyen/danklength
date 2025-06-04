@@ -46,6 +46,12 @@
   color: var(--tama-dark);
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .pack-modal-header h2 {
   margin: 0;
   font-size: 24px;
@@ -138,6 +144,109 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+/* Username change button */
+.username-change-button {
+  background: linear-gradient(135deg, var(--tama-blue), var(--tama-green));
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.username-change-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Username editing section */
+.username-edit-section {
+  text-align: center;
+  padding: 20px 0;
+  border-bottom: 2px solid #f0f0f0;
+  margin-bottom: 20px;
+}
+
+.username-edit-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tama-dark);
+}
+
+.username-edit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  align-items: center;
+}
+
+.username-edit-group input {
+  padding: 12px 16px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  font-size: 16px;
+  font-family: 'Nunito', 'Comic Sans MS', cursive, sans-serif;
+  font-weight: 500;
+  width: 250px;
+  max-width: 100%;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.username-edit-group input:focus {
+  border-color: var(--tama-pink);
+}
+
+.username-edit-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-username-btn {
+  background: linear-gradient(135deg, var(--tama-green), #34ce57);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.confirm-username-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.confirm-username-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cancel-username-btn {
+  background: linear-gradient(135deg, #6c757d, #868e96);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.cancel-username-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #5a6268, #6c757d);
 }
 
 /* Pack mode selection */

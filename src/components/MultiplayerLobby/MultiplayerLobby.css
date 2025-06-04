@@ -105,10 +105,39 @@
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  padding-top: 10px;
+  padding: 10px;
   justify-content: center;
   max-width: 100%;
-  overflow: visible;
+  max-height: 35vh; /* Limit height to prevent overflow */
+  overflow-y: auto; /* Make scrollable when content exceeds max-height */
+  border-radius: 12px;
+  /* Add subtle styling for the scroll area */
+  border: 2px solid transparent;
+  transition: border-color 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.prompts-gallery:hover {
+  border-color: rgba(111, 66, 193, 0.2);
+}
+
+/* Custom scrollbar styling */
+.prompts-gallery::-webkit-scrollbar {
+  width: 8px;
+}
+
+.prompts-gallery::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.prompts-gallery::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--tama-pink), var(--tama-purple));
+  border-radius: 4px;
+}
+
+.prompts-gallery::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--tama-purple), var(--tama-pink));
 }
 
 .prompt-card {

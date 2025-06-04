@@ -450,6 +450,17 @@ export const useSocket = () => {
     }));
   };
 
+  const resetGameKeepRoom = () => {
+    setMultiplayerState(prev => ({
+      ...prev,
+      gameStarted: false,
+      gameConfig: null,
+      syncedGameState: null,
+      promptVotes: [],
+      votingTimeLeft: 0,
+    }));
+  };
+
   const leaveGame = () => {
     if (socketRef.current && multiplayerState.gameCode) {
       socketRef.current.emit('leave-game', {
@@ -556,6 +567,7 @@ export const useSocket = () => {
     sendPlayerAction,
     clearErrors,
     resetMultiplayer,
+    resetGameKeepRoom,
     leaveGame,
     reconnectToGame,
     getCachedGameSession,

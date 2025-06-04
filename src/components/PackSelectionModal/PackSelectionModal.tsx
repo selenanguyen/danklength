@@ -12,6 +12,7 @@ interface PackSelectionModalProps {
   onCreatePack: (packName: string, selectedPrompts: SpectrumConcept[]) => void;
   onAddToExistingPack: (packId: string, selectedPrompts: SpectrumConcept[]) => void;
   onSetUsername?: (username: string) => void;
+  isRemoteMode?: boolean; // New prop to identify remote mode
 }
 
 export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
@@ -23,6 +24,7 @@ export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
   onCreatePack,
   onAddToExistingPack,
   onSetUsername,
+  isRemoteMode = false,
 }) => {
   const [selectedPrompts, setSelectedPrompts] = useState<Set<string>>(new Set());
   const [newPackName, setNewPackName] = useState('');
@@ -30,6 +32,8 @@ export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
   const [mode, setMode] = useState<'create' | 'existing'>('create');
   const [usernameInput, setUsernameInput] = useState(currentUsername || '');
   const [showUsernameInput, setShowUsernameInput] = useState(!currentUsername);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editUsernameInput, setEditUsernameInput] = useState('');
 
   // Reset form when modal opens
   useEffect(() => {
@@ -81,6 +85,23 @@ export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
     }
   };
 
+  const handleStartEditingUsername = () => {
+    setEditUsernameInput(currentUsername || '');
+    setIsEditingUsername(true);
+  };
+
+  const handleConfirmUsernameChange = () => {
+    if (editUsernameInput.trim() && onSetUsername) {
+      onSetUsername(editUsernameInput.trim());
+      setIsEditingUsername(false);
+    }
+  };
+
+  const handleCancelUsernameEdit = () => {
+    setIsEditingUsername(false);
+    setEditUsernameInput('');
+  };
+
   const handleSave = () => {
     const selectedPromptObjects = prompts.filter(p => selectedPrompts.has(p.id));
     
@@ -112,7 +133,19 @@ export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
       <div className="pack-modal">
         <div className="pack-modal-header">
           <h2>📦 Save Custom Spectrum Pack</h2>
-          <button className="pack-modal-close" onClick={onClose}>×</button>
+          <div className="header-controls">
+            {/* Username change button - only in non-remote mode and when user has a username */}
+            {!isRemoteMode && currentUsername && !showUsernameInput && (
+              <button 
+                className="username-change-button"
+                onClick={handleStartEditingUsername}
+                title="Change username"
+              >
+                👤 {currentUsername}
+              </button>
+            )}
+            <button className="pack-modal-close" onClick={onClose}>×</button>
+          </div>
         </div>
 
         <div className="pack-modal-content">
@@ -140,8 +173,43 @@ export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
             </div>
           )}
 
+          {/* Username editing interface */}
+          {!showUsernameInput && isEditingUsername && (
+            <div className="username-edit-section">
+              <h3>Change Username</h3>
+              <div className="username-edit-group">
+                <input
+                  type="text"
+                  value={editUsernameInput}
+                  onChange={(e) => setEditUsernameInput(e.target.value)}
+                  placeholder="Enter new username..."
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') handleConfirmUsernameChange();
+                    if (e.key === 'Escape') handleCancelUsernameEdit();
+                  }}
+                  autoFocus
+                />
+                <div className="username-edit-buttons">
+                  <button 
+                    onClick={handleConfirmUsernameChange}
+                    disabled={!editUsernameInput.trim()}
+                    className="confirm-username-btn"
+                  >
+                    Save
+                  </button>
+                  <button 
+                    onClick={handleCancelUsernameEdit}
+                    className="cancel-username-btn"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Main pack selection interface */}
-          {!showUsernameInput && (
+          {!showUsernameInput && !isEditingUsername && (
             <>
               {/* Pack mode selection */}
               <div className="pack-mode-selection">
@@ -284,7 +352,7 @@ export const PackSelectionModal: React.FC<PackSelectionModalProps> = ({
         </div>
 
         {/* Modal footer */}
-        {!showUsernameInput && (
+        {!showUsernameInput && !isEditingUsername && (
           <div className="pack-modal-footer">
             <button className="cancel-btn" onClick={onClose}>
               Cancel

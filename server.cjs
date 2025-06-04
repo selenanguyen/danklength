@@ -659,7 +659,7 @@ io.on('connection', (socket) => {
     const nextRound = room.gameState.currentRound + 1;
     const totalRounds = room.gameState.totalRounds || 8;
     
-    if (nextRound > 1) { // TODO (Selena, not claude): change this back to totalRounds
+    if (nextRound > 2) { // TODO (Selena, not claude): change this back to totalRounds
       // Game should end
       room.gameState.gamePhase = 'ended';
       io.to(room.code).emit('game-state-updated', { gameState: room.gameState });

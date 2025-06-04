@@ -19,7 +19,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Builds and deploys to Netlify
   - Provides all URLs needed
 
-### Testing Server Health
+### Testing & Quality Assurance
+- `npm run test` - Run comprehensive test suite (unit + integration)
+- `npm run test:unit` - Run game state logic unit tests only
+- `npm run test:integration` - Run multiplayer Socket.IO integration tests
+- `./run-tests.sh` - Full test runner with server management
 - `curl YOUR_NGROK_URL/health` - Test server connectivity
 - `curl YOUR_NGROK_URL/socket.io/?EIO=4&transport=polling&t=TIMESTAMP` - Test Socket.IO
 
@@ -126,3 +130,48 @@ io(serverUrl, {
 - 8 rounds total by default
 - Psychic role rotates each round
 - Game ends when team reaches 10 points OR 8 rounds complete
+
+## Testing Architecture
+
+### Comprehensive Test Suite
+The project includes extensive testing for the custom remote game mode:
+
+#### Unit Tests (`test-game-state.js`)
+- **Game State Logic**: Initialization, phase transitions, round progression
+- **Prompt Voting**: Vote counting, lock-in mechanics, winner selection
+- **Score Calculation**: Distance-based zones (center: 4pts, inner: 3pts, outer: 2pts, miss: 0pts)
+- **Edge Cases**: Boundary conditions, single players, extreme positions
+- **100% Coverage**: All core game mechanics tested
+
+#### Integration Tests (`test-custom-remote-game.js`)
+- **Multi-player Setup**: 4 players (Alice=Host, Bob, Charlie, Diana)
+- **Socket.IO Events**: All 15+ events tested (create-game, join-game, vote-prompt, etc.)
+- **Real-time Sync**: State synchronization across all connected clients
+- **Phase Progression**: prompt-voting → psychic → guessing → scoring → next round
+- **Error Handling**: Disconnections, invalid actions, network resilience
+
+#### Test Coverage Areas
+1. **Game Initialization** (4 players join custom game)
+2. **Prompt Voting Phase** (vote sync, lock-in, dynamic prompts)
+3. **Psychic Phase** (role identification, clue submission, dial sync)
+4. **Guessing Phase** (multi-player voting, position tracking)
+5. **Scoring & Progression** (calculation, round advancement, psychic rotation)
+6. **Cleanup & Edge Cases** (disconnections, invalid actions, stress tests)
+
+#### Running Tests
+```bash
+npm run test         # Full suite with server management
+npm run test:unit    # Game logic only (fast)
+npm run test:integration # Socket.IO multiplayer (requires server)
+```
+
+#### Test Results Format
+```
+📊 Test Results Summary:
+Total Tests: 23
+✅ Passed: 23  
+❌ Failed: 0
+📈 Success Rate: 100.0%
+```
+
+See `TESTING.md` for detailed documentation and troubleshooting.

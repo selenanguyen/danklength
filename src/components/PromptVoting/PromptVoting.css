@@ -7,7 +7,7 @@
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
-  justify-content: center;
+  justify-content: flex-start; /* Changed from center to flex-start to prevent overflow */
 }
 
 .voting-header {
@@ -78,11 +78,40 @@
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  padding-top: 10px;
+  padding: 10px;
   justify-content: center;
   max-width: 100%;
-  overflow: visible;
+  max-height: 40vh; /* Limit height to prevent overflow */
+  overflow-y: auto; /* Make scrollable when content exceeds max-height */
   margin-bottom: 30px;
+  border-radius: 12px;
+  border: none; /* Remove any border */
+  transition: none; /* Remove transition */
+}
+
+/* Remove hover border effect */
+.prompts-gallery:hover {
+  border: none;
+  border-color: transparent;
+}
+
+/* Custom scrollbar styling */
+.prompts-gallery::-webkit-scrollbar {
+  width: 8px;
+}
+
+.prompts-gallery::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.prompts-gallery::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, var(--tama-pink), var(--tama-purple));
+  border-radius: 4px;
+}
+
+.prompts-gallery::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, var(--tama-purple), var(--tama-pink));
 }
 
 .prompt-card {
@@ -93,7 +122,7 @@
   font-weight: 600;
   font-size: 16px;
   color: var(--tama-dark);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  /* Removed box-shadow */
   animation: 
     prompt-card-appear 0.5s ease-out forwards,
     prompt-float 4s ease-in-out infinite;
@@ -142,22 +171,19 @@
 
 .prompt-card:hover {
   transform: scale(1.05) translateY(-3px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
+  border: 3px solid #4CAF50;
 }
 
 /* Selected state styling */
 .prompt-card.selected {
-  background: linear-gradient(135deg, #FF69B4, #FFB6C1) !important;
-  border: 3px solid #FF1493;
-  transform: scale(1.1) translateY(-5px);
-  box-shadow: 
-    0 15px 40px rgba(255, 20, 147, 0.5),
-    0 8px 25px rgba(255, 105, 180, 0.4);
+  border: 3px solid #4CAF50 !important;
+  transform: scale(1.05) translateY(-3px);
+  box-shadow: none;
   animation: 
     prompt-card-appear 0.5s ease-out forwards,
-    prompt-float 4s ease-in-out infinite,
-    selectedPulse 2s ease-in-out infinite;
-  animation-delay: var(--appear-delay, 0s), calc(var(--float-delay, 0s) + 0.5s), 0s;
+    prompt-float 4s ease-in-out infinite;
+  animation-delay: var(--appear-delay, 0s), calc(var(--float-delay, 0s) + 0.5s);
 }
 
 /* Locked state styling */
@@ -169,7 +195,7 @@
 
 .prompt-card.locked:hover {
   transform: scale(1) translateY(0);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 @keyframes prompt-card-appear {
@@ -196,36 +222,29 @@
   }
 }
 
-@keyframes selectedPulse {
-  0%, 100% { 
-    box-shadow: 0 15px 40px rgba(255, 20, 147, 0.5), 0 8px 25px rgba(255, 105, 180, 0.4); 
-  }
-  50% { 
-    box-shadow: 0 20px 50px rgba(255, 20, 147, 0.7), 0 10px 30px rgba(255, 105, 180, 0.6); 
-  }
-}
 
 .prompt-text {
   margin-bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  width: 100%;
+  text-align: center;
 }
 
 .vote-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
   background: linear-gradient(135deg, #4CAF50, #66BB6A);
   color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
-  margin-left: 6px;
-  display: inline-block;
-  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
 }
 
 .voting-actions {

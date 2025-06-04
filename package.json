@@ -9,7 +9,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server.cjs"
+    "start": "node server.cjs",
+    "test": "./run-tests.sh",
+    "test:unit": "node test-game-state.js",
+    "test:integration": "node test-custom-remote-game.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

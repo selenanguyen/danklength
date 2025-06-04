@@ -44,7 +44,8 @@
   border-radius: 5px 5px 0 0;
   top: min(4.95vw, 49.5px);
   left: 50%;
-  transform-origin: 50% min(22vw, 220px);
+  margin-left: -5px; /* Center the pointer properly by offsetting half its width */
+  transform-origin: 50% calc(100% + min(0.65vw, 6.5px)); /* Adjust transform origin to the center hinge */
   cursor: pointer;
   z-index: 3;
   box-shadow: 
@@ -120,8 +121,9 @@
   .dial-pointer {
     height: min(32vw, 160px);
     width: 5px;
+    margin-left: -2.5px; /* Center the narrower pointer */
     top: min(8vw, 40px);
-    transform-origin: 50% min(32vw, 160px);
+    transform-origin: 50% calc(100% + min(1vw, 8px));
   }
   
   .dial-center {
@@ -154,8 +156,9 @@
   .dial-pointer {
     height: min(36vw, 120px);
     width: 4px;
+    margin-left: -2px; /* Center the thinnest pointer for mobile */
     top: min(9vw, 30px);
-    transform-origin: 50% min(36vw, 120px);
+    transform-origin: 50% calc(100% + min(1.2vw, 10px)); /* Adjust transform origin for mobile hinge */
   }
   
   .dial-center {

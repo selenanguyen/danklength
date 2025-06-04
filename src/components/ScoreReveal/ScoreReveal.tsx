@@ -8,6 +8,7 @@ interface ScoreRevealProps {
   gameState: GameState;
   currentUsername?: string;
   onFinish: () => void;
+  isRemoteMode?: boolean;
 }
 
 interface ScoreZone {
@@ -26,7 +27,7 @@ const SCORE_ZONES: ScoreZone[] = [
   { label: 'WOW!', color: '#28a745', start: 83.33, end: 100 }
 ];
 
-export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUsername, onFinish }) => {
+export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUsername, onFinish, isRemoteMode = false }) => {
   const [currentRound, setCurrentRound] = useState(0);
   const [revealedScore, setRevealedScore] = useState(0);
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -55,8 +56,8 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
     const psychicIndex = roundIndex % gameState.players.length;
     const psychic = gameState.players[psychicIndex];
     
-    // Try to get clue from round history if available, otherwise use placeholder
-    const clue = gameState.psychicClue || `Round ${roundIndex + 1} clue`;
+    // Get clue from round history if available, otherwise use placeholder
+    const clue = gameState.roundClues?.[roundIndex] || `Round ${roundIndex + 1} clue`;
     
     return {
       score,
@@ -80,26 +81,26 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
           const newScore = gameState.roundScores.slice(0, currentRound + 1).reduce((sum, score) => sum + score, 0);
           setRevealedScore(newScore);
           
-          // Show points animation after dial starts moving (750ms into the 1.5s dial animation)
+          // Show points animation after dial starts moving (500ms into the 1.2s dial animation)
           setTimeout(() => {
             setIsAnimating(true);
-          }, 750);
+          }, 500);
           
           // Start fade out transition before moving to next round
           setTimeout(() => {
             if (currentRound + 1 < gameState.roundScores.length) {
               setIsTransitioning(true);
             }
-          }, 4200);
+          }, 2800);
           
           // Move to next round after fade out completes
           setTimeout(() => {
             setCurrentRound(currentRound + 1);
             setIsAnimating(false);
             setIsTransitioning(false);
-          }, 4500);
+          }, 3100);
         }
-      }, 1500);
+      }, 1000);
 
       return () => clearTimeout(timer);
     } else if (!showFinalMessage) {
@@ -107,11 +108,11 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
       setRevealedScore(totalScore);
       setTimeout(() => {
         setIsTransitioning(true);
-      }, 700);
+      }, 500);
       setTimeout(() => {
         setShowFinalMessage(true);
         setIsTransitioning(false);
-      }, 1000);
+      }, 800);
     }
   }, [currentRound, gameState.roundScores.length, showFinalMessage]);
 
@@ -122,7 +123,7 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
     if (targetScore !== animatedScore) {
       const startScore = animatedScore;
       const diff = targetScore - startScore;
-      const duration = 1500; // 1.5 seconds
+      const duration = 1200; // 1.2 seconds
       const startTime = Date.now();
       
       const animate = () => {
@@ -334,6 +335,7 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
           onCreatePack={handleCreatePack}
           onAddToExistingPack={handleAddToExistingPack}
           onSetUsername={setCurrentUsername}
+          isRemoteMode={isRemoteMode}
         />
       )}
     </div>

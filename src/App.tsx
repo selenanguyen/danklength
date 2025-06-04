@@ -5,6 +5,7 @@ import { GameSetup } from './components/GameSetup/GameSetup';
 import { PlayerSetup } from './components/PlayerSetup/PlayerSetup';
 import { MultiplayerLobby } from './components/MultiplayerLobby/MultiplayerLobby';
 import { PromptVoting } from './components/PromptVoting/PromptVoting';
+import { PsychicAnnouncement } from './components/PsychicAnnouncement/PsychicAnnouncement';
 import { SpectrumCard } from './components/SpectrumCard/SpectrumCard';
 import { Dial } from './components/Dial/Dial';
 import { ScoreReveal } from './components/ScoreReveal/ScoreReveal';
@@ -27,13 +28,21 @@ function App() {
     updateGuessVotePosition,
     checkAllPlayersLockedIn,
     lockInRemotePlayerGuess,
+    startPsychicPhase,
+    voteForPromptLocal,
+    lockInPromptVote,
+    unlockPromptVote,
+    addCustomPromptDuringVoting,
+    finishPromptVoting,
   } = useGameState();
 
   const socketInstance = useSocket();
-  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction, voteForPrompt, lockInVote, nextRound } = socketInstance;
+  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction, voteForPrompt, lockInVote, nextRound, resetGameKeepRoom } = socketInstance;
 
   const [clueInput, setClueInput] = useState('');
   const [playMode, setPlayMode] = useState<'local' | 'remote' | null>(null);
+  const [lastGameConfig, setLastGameConfig] = useState<GameConfig | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Emoji reaction system
   const [fallingEmojis, setFallingEmojis] = useState<Array<{
@@ -127,6 +136,46 @@ function App() {
     }
   }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, gameState.psychicClue, updateGameState]);
 
+  // Handle automatic progression from prompt voting in local mode
+  useEffect(() => {
+    if (playMode === 'local' && gameState.gamePhase === 'prompt-voting' && !isTransitioning) {
+      const promptVotes = gameState.promptVotes || [];
+      const votingTimeLeft = gameState.votingTimeLeft || 0;
+      
+      // Check if voting should finish (timer expired OR player locked in)
+      const playerLockedIn = promptVotes.some(vote => vote.playerId === 'local-player' && vote.isLockedIn);
+      
+      if (votingTimeLeft <= 0 || playerLockedIn) {
+        setIsTransitioning(true);
+        
+        // If timer expired and player has a vote but hasn't locked in, lock it in first
+        const playerVote = promptVotes.find(vote => vote.playerId === 'local-player');
+        const needsLockIn = votingTimeLeft <= 0 && playerVote && !playerVote.isLockedIn && playerVote.promptId !== '';
+        
+        if (needsLockIn) {
+          lockInPromptVote('local-player');
+          // Then finish voting after a short delay
+          setTimeout(() => {
+            finishPromptVoting();
+          }, 500);
+        } else {
+          // Small delay to show the locked in state before transitioning
+          const delay = playerLockedIn ? 1000 : 0;
+          setTimeout(() => {
+            finishPromptVoting();
+          }, delay);
+        }
+      }
+    }
+  }, [playMode, gameState.gamePhase, gameState.promptVotes, gameState.votingTimeLeft, isTransitioning]);
+
+  // Reset transitioning flag when game phase changes
+  useEffect(() => {
+    if (gameState.gamePhase !== 'prompt-voting') {
+      setIsTransitioning(false);
+    }
+  }, [gameState.gamePhase]);
+
   // Listen for dial updates from all players for real-time synchronization
   useEffect(() => {
     if (playMode === 'remote') {
@@ -192,16 +241,80 @@ function App() {
 
   const handleMultiplayerSetup = () => {
     setPlayMode('remote');
+    setLastGameConfig(null); // Clear any previous game config for fresh start
   };
 
   const handlePlayerSetup = (config: GameConfig) => {
+    setLastGameConfig(config); // Store config for play again
     initializeAndStartGame(config);
   };
 
   const handleBackToWelcome = () => {
     setPlayMode(null);
+    setLastGameConfig(null); // Clear any previous game config
     resetGame();
   };
+
+  const handlePlayAgain = () => {
+    setPlayMode(null);
+    setLastGameConfig(null); // Clear any previous game config
+    resetGame();
+  };
+
+  const handlePlayAgainWithConfig = () => {
+    if (lastGameConfig) {
+      // Get all custom prompts that were used during the game (including those added during voting)
+      const allCustomPrompts = playMode === 'remote' 
+        ? (multiplayerState.syncedGameState?.customPrompts || gameState.customPrompts || [])
+        : (gameState.customPrompts || []);
+
+      // Convert SpectrumConcept objects back to string format for config
+      const promptStrings = allCustomPrompts.map(prompt => `${prompt.leftConcept} vs ${prompt.rightConcept}`);
+
+      // Update the config with all prompts that were accumulated during the game
+      const updatedConfig = {
+        ...lastGameConfig,
+        customPrompts: promptStrings
+      };
+      
+      // Update the stored config for future "Play Again" clicks
+      setLastGameConfig(updatedConfig);
+      
+      setPlayMode('local');
+      initializeGame(updatedConfig);
+    } else {
+      handlePlayAgain();
+    }
+  };
+
+  const handlePlayAgainRemote = () => {
+    // For remote games, go back to lobby with all settings preserved
+    // Get all custom prompts that were used during the game (including those added during voting)
+    const allCustomPrompts = multiplayerState.syncedGameState?.customPrompts || gameState.customPrompts || [];
+    
+    // Convert SpectrumConcept objects back to string format for config
+    const promptStrings = allCustomPrompts.map(prompt => `${prompt.leftConcept} vs ${prompt.rightConcept}`);
+
+    // Create config with current game settings
+    const gameConfig: GameConfig = {
+      mode: gameState.gameMode as 'normal' | 'custom',
+      players: gameState.players.map(p => p.name),
+      customPrompts: promptStrings
+    };
+    
+    // Store config for the lobby to use
+    setLastGameConfig(gameConfig);
+    
+    // Reset the local game state
+    resetGame();
+    
+    // Reset only the game state while preserving room connection
+    resetGameKeepRoom();
+    
+    // playMode stays 'remote', connection and room info preserved
+    // This should show the MultiplayerLobby with the preserved config
+  };
+
 
   const handleReconnect = () => {
     const success = reconnectToGame();
@@ -313,7 +426,7 @@ function App() {
       }
     } else {
       // In local mode, anyone can advance
-      startNewRound();
+      startNewRound(playMode || 'local');
     }
   };
 
@@ -340,6 +453,7 @@ function App() {
         <MultiplayerLobby 
           onBackToLocal={handleBackToWelcome}
           socketInstance={socketInstance}
+          initialConfig={lastGameConfig}
         />
       </div>
     );
@@ -349,7 +463,7 @@ function App() {
   if (gameState.gamePhase === 'player-setup' && playMode === 'local') {
     return (
       <div className="game-container compact">
-        <PlayerSetup onStartGame={handlePlayerSetup} onBackToMain={handleBackToWelcome} />
+        <PlayerSetup onStartGame={handlePlayerSetup} onBackToMain={handleBackToWelcome} initialConfig={lastGameConfig} />
       </div>
     );
   }
@@ -375,18 +489,22 @@ function App() {
           votingTimeLeft={votingTimeLeft}
           currentPlayerId={currentPlayerId}
           currentUsername={currentUsername}
-          onVotePrompt={voteForPrompt}
-          onLockIn={lockInVote}
+          onVotePrompt={playMode === 'remote' ? voteForPrompt : voteForPromptLocal}
+          onLockIn={playMode === 'remote' ? lockInVote : lockInPromptVote}
           onUnlockVote={() => {
             if (playMode === 'remote') {
               const { unlockVote } = socketInstance;
               unlockVote();
+            } else {
+              unlockPromptVote();
             }
           }}
           onAddNewPrompt={(prompt) => {
             if (playMode === 'remote') {
               const { submitCustomPromptDuringVoting } = socketInstance;
               submitCustomPromptDuringVoting(prompt);
+            } else {
+              addCustomPromptDuringVoting(prompt);
             }
           }}
           currentRound={gameState.currentRound}
@@ -395,17 +513,45 @@ function App() {
     );
   }
 
+  // Psychic announcement phase (local mode only)
+  if (gameState.gamePhase === 'psychic-announcement' && playMode === 'local') {
+    const currentPlayer = gameState.players[gameState.currentPsychicIndex];
+    if (!currentPlayer) {
+      return <div>Error: No current player found</div>;
+    }
+    return (
+      <PsychicAnnouncement
+        currentPsychic={currentPlayer}
+        currentRound={gameState.currentRound}
+        onContinue={startPsychicPhase}
+      />
+    );
+  }
+
   // Game ended screen - Wavelength-style score reveal
   if (gameState.gamePhase === 'ended') {
     const endGameUsername = playMode === 'remote' 
       ? multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name
       : undefined;
+
+    // Get all custom prompts that were used during the game
+    // For remote mode, prefer synced state; for local mode, use game state
+    const allCustomPrompts = playMode === 'remote' 
+      ? (multiplayerState.syncedGameState?.customPrompts || gameState.customPrompts || [])
+      : (gameState.customPrompts || []);
+
+    // Create a modified game state with all the prompts for saving
+    const gameStateWithAllPrompts = {
+      ...gameState,
+      customPrompts: allCustomPrompts
+    };
       
     return (
       <ScoreReveal 
-        gameState={gameState}
+        gameState={gameStateWithAllPrompts}
         currentUsername={endGameUsername}
-        onFinish={resetGame}
+        onFinish={playMode === 'local' ? handlePlayAgainWithConfig : handlePlayAgainRemote}
+        isRemoteMode={playMode === 'remote'}
       />
     );
   }
@@ -526,8 +672,8 @@ function App() {
           }
         }}
         disabled={gameState.gamePhase === 'scoring' || 
-                  (gameState.gamePhase === 'guessing' && isCurrentPlayerPsychic) ||
-                  (gameState.gamePhase === 'guessing' && checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []))}
+                  (gameState.gamePhase === 'guessing' && playMode === 'remote' && isCurrentPlayerPsychic) ||
+                  (gameState.gamePhase === 'guessing' && playMode === 'remote' && checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []))}
         hidePointer={false}
         hideForNonPsychic={gameState.gamePhase === 'psychic' && !isCurrentPlayerPsychic}
         isPsychicPhase={gameState.gamePhase === 'psychic' && isCurrentPlayerPsychic}
@@ -595,12 +741,15 @@ function App() {
               </div>
             )}
             
-            {isCurrentPlayerPsychic ? (
+            {(playMode === 'remote' && isCurrentPlayerPsychic) ? (
               <p>Watch your team work together to guess the target position! You can see live updates as they move the dial.</p>
             ) : (
               <>
-                <p>Work together to position the dial where you think the target is! 
-                   {playMode === 'remote' && ' All players can move the dial simultaneously - work together!'}
+                <p>
+                  {playMode === 'local' 
+                    ? 'Work together to position the dial where you think the target is! Discuss and agree on your guess.'
+                    : 'Work together to position the dial where you think the target is! All players can move the dial simultaneously - work together!'
+                  }
                 </p>
                 
                 {(() => {
@@ -613,29 +762,42 @@ function App() {
                     currentPlayerId = 'local-guesser';
                   }
                   
-                  const currentPlayerVote = gameState.guessVotes?.find(vote => vote.playerId === currentPlayerId);
-                  const isLockedIn = currentPlayerVote?.isLockedIn || false;
-                  const allPlayersLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []);
-                  
-                  if (allPlayersLockedIn) {
-                    return <p>🔒 All players have locked in their guesses! Calculating score...</p>;
-                  } else if (isLockedIn) {
-                    return (
-                      <>
-                        <p>✅ You've locked in your guess! Waiting for other players...</p>
-                        <p><em>Move the dial to unlock and change your guess.</em></p>
-                      </>
-                    );
-                  } else {
+                  if (playMode === 'local') {
+                    // Local mode: simple single button to submit guess
                     return (
                       <button 
                         className="action-button" 
                         onClick={handleSubmitGuess}
-                        disabled={allPlayersLockedIn}
                       >
-                        Lock In Guess
+                        Submit Guess
                       </button>
                     );
+                  } else {
+                    // Remote mode: complex voting logic
+                    const currentPlayerVote = gameState.guessVotes?.find(vote => vote.playerId === currentPlayerId);
+                    const isLockedIn = currentPlayerVote?.isLockedIn || false;
+                    const allPlayersLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []);
+                    
+                    if (allPlayersLockedIn) {
+                      return <p>🔒 All players have locked in their guesses! Calculating score...</p>;
+                    } else if (isLockedIn) {
+                      return (
+                        <>
+                          <p>✅ You've locked in your guess! Waiting for other players...</p>
+                          <p><em>Move the dial to unlock and change your guess.</em></p>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <button 
+                          className="action-button" 
+                          onClick={handleSubmitGuess}
+                          disabled={allPlayersLockedIn}
+                        >
+                          Lock In Guess
+                        </button>
+                      );
+                    }
                   }
                 })()}
               </>

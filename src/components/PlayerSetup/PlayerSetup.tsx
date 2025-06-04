@@ -1,20 +1,25 @@
-import React, { useState } from 'react';
-import type { GameConfig, SpectrumConcept } from '../../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { GameConfig, SpectrumConcept, PromptPack } from '../../types';
 import { useUserPacks } from '../../hooks/useUserPacks';
 import { PackSelectionModal } from '../PackSelectionModal/PackSelectionModal';
+import { config } from '../../config';
 import './PlayerSetup.css';
 
 interface PlayerSetupProps {
   onStartGame: (config: GameConfig) => void;
   onBackToMain?: () => void;
+  initialConfig?: GameConfig | null;
 }
 
-export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToMain }) => {
+export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToMain, initialConfig }) => {
   const [gameMode, setGameMode] = useState<'normal' | 'custom'>('normal');
   const [addedPlayers, setAddedPlayers] = useState<string[]>([]);
   const [newPlayerName, setNewPlayerName] = useState('');
-  const [customPrompts, setCustomPrompts] = useState<string[]>(['']);
+  const [customPrompts, setCustomPrompts] = useState<string[]>([]);
+  const [leftSide, setLeftSide] = useState('');
+  const [rightSide, setRightSide] = useState('');
   const [showPackModal, setShowPackModal] = useState(false);
+  const [allPlayerPacks, setAllPlayerPacks] = useState<{username: string, packs: PromptPack[]}[]>([]);
 
   const {
     userPacks,
@@ -24,6 +29,53 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
     addToExistingPack,
     loadPackPrompts,
   } = useUserPacks();
+
+  // Load packs from any username
+  const loadUserPacksForUsername = useCallback(async (usernameToLoad: string): Promise<PromptPack[]> => {
+    try {
+      const response = await fetch(`${config.serverUrl}/api/packs/${encodeURIComponent(usernameToLoad)}`);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error('Error loading user packs:', error);
+    }
+    return [];
+  }, []);
+
+  // Load packs from all added players whenever the player list changes
+  useEffect(() => {
+    const loadAllPlayerPacks = async () => {
+      const allPacks: {username: string, packs: PromptPack[]}[] = [];
+      
+      // Load packs for each added player
+      for (const playerName of addedPlayers) {
+        const packs = await loadUserPacksForUsername(playerName);
+        if (packs.length > 0) {
+          allPacks.push({ username: playerName, packs });
+        }
+      }
+      
+      setAllPlayerPacks(allPacks);
+    };
+
+    if (addedPlayers.length > 0) {
+      loadAllPlayerPacks();
+    } else {
+      setAllPlayerPacks([]);
+    }
+  }, [addedPlayers, loadUserPacksForUsername]);
+
+  // Populate initial values when initialConfig is provided
+  useEffect(() => {
+    if (initialConfig) {
+      setGameMode(initialConfig.mode);
+      setAddedPlayers(initialConfig.players);
+      if (initialConfig.mode === 'custom' && initialConfig.customPrompts) {
+        setCustomPrompts(initialConfig.customPrompts);
+      }
+    }
+  }, [initialConfig]);
 
   const addPlayer = () => {
     if (newPlayerName.trim() !== '') {
@@ -42,20 +94,20 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
     }
   };
 
-  const addPrompt = () => {
-    setCustomPrompts([...customPrompts, '']);
-  };
-
-  const removePrompt = (index: number) => {
-    if (customPrompts.length > 1) {
-      setCustomPrompts(customPrompts.filter((_, i) => i !== index));
+  const submitPrompt = () => {
+    if (leftSide.trim() && rightSide.trim()) {
+      const prompt = `${leftSide.trim()} vs ${rightSide.trim()}`;
+      setCustomPrompts([...customPrompts, prompt]);
+      setLeftSide('');
+      setRightSide('');
     }
   };
 
-  const updatePrompt = (index: number, prompt: string) => {
-    const newPrompts = [...customPrompts];
-    newPrompts[index] = prompt;
-    setCustomPrompts(newPrompts);
+  const handlePromptKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitPrompt();
+    }
   };
 
   const handleCreatePack = async (packName: string, selectedPrompts: SpectrumConcept[]) => {
@@ -67,39 +119,56 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
   };
 
   const handleLoadFromPack = (packId: string) => {
-    const packPrompts = loadPackPrompts(packId);
-    if (packPrompts) {
+    // First try to find pack in current user's packs
+    let packPrompts = loadPackPrompts(packId);
+    
+    // If not found, search in all player packs
+    if (!packPrompts || packPrompts.length === 0) {
+      for (const playerPackGroup of allPlayerPacks) {
+        const pack = playerPackGroup.packs.find(p => p.id === packId);
+        if (pack) {
+          packPrompts = pack.prompts;
+          break;
+        }
+      }
+    }
+    
+    if (packPrompts && packPrompts.length > 0) {
       const promptStrings = packPrompts.map(p => `${p.leftConcept} vs ${p.rightConcept}`);
-      setCustomPrompts([...promptStrings, '']); // Add empty one for new additions
-      setGameMode('custom');
+      
+      // Filter out duplicates by checking against existing prompts
+      const newUniquePrompts = promptStrings.filter(newPrompt => 
+        !customPrompts.includes(newPrompt)
+      );
+      
+      if (newUniquePrompts.length > 0) {
+        setCustomPrompts([...customPrompts, ...newUniquePrompts]);
+        setGameMode('custom');
+      } else {
+        alert('All prompts from this pack are already added to your game!');
+      }
     }
   };
 
   // Convert custom prompt strings to SpectrumConcept objects for pack saving
   const getSpectrumConceptsFromPrompts = (): SpectrumConcept[] => {
-    return customPrompts
-      .filter(prompt => prompt.trim())
-      .map((prompt, index) => {
-        const parts = prompt.split(' vs ');
-        return {
-          id: `custom-${Date.now()}-${index}`,
-          leftConcept: parts[0]?.trim() || 'Left',
-          rightConcept: parts[1]?.trim() || 'Right',
-        };
-      });
+    return customPrompts.map((prompt, index) => {
+      const parts = prompt.split(' vs ');
+      return {
+        id: `custom-${Date.now()}-${index}`,
+        leftConcept: parts[0]?.trim() || 'Left',
+        rightConcept: parts[1]?.trim() || 'Right',
+      };
+    });
   };
 
   const handleSubmit = () => {
-    const validPrompts = gameMode === 'custom' 
-      ? customPrompts.filter(prompt => prompt.trim() !== '')
-      : undefined;
-    
     if (addedPlayers.length < 2) {
       alert('Please add at least 2 players');
       return;
     }
 
-    if (gameMode === 'custom' && (!validPrompts || validPrompts.length === 0)) {
+    if (gameMode === 'custom' && customPrompts.length === 0) {
       alert('Please add at least 1 custom prompt');
       return;
     }
@@ -107,7 +176,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
     const config: GameConfig = {
       mode: gameMode,
       players: addedPlayers,
-      customPrompts: validPrompts,
+      customPrompts: gameMode === 'custom' ? customPrompts : undefined,
     };
 
     onStartGame(config);
@@ -199,61 +268,104 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
 
       {gameMode === 'custom' && (
         <div className="prompts-section">
-          <div className="prompts-header">
-            <h3>Custom Prompts ({customPrompts.filter(p => p.trim()).length})</h3>
-            <div className="pack-actions">
-              {userPacks.length > 0 && (
-                <select 
-                  onChange={(e) => e.target.value && handleLoadFromPack(e.target.value)}
-                  value=""
-                  className="load-pack-select"
+          <h3>Spectrums</h3>
+          
+          {/* Submitted prompts display */}
+          {customPrompts.length > 0 && (
+            <div className="prompts-gallery">
+              {customPrompts.map((prompt, index) => (
+                <div 
+                  key={index} 
+                  className="prompt-card" 
+                  style={{ 
+                    '--appear-delay': `${index * 0.1}s`,
+                    '--float-delay': `${index * 0.3}s`
+                  } as React.CSSProperties}
                 >
-                  <option value="">📦 Load from Pack</option>
-                  {userPacks.map(pack => (
-                    <option key={pack.id} value={pack.id}>
-                      {pack.name} ({pack.prompts.length} prompts)
-                    </option>
-                  ))}
-                </select>
-              )}
-              {customPrompts.some(p => p.trim()) && (
-                <button
-                  onClick={() => setShowPackModal(true)}
-                  className="save-pack-button"
-                >
-                  💾 Save to Pack
-                </button>
-              )}
+                  {prompt}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Show message when no prompts yet */}
+          {customPrompts.length === 0 && (
+            <p className="waiting-for-prompts">Add some custom spectrums below!</p>
+          )}
+
+          {/* Prompt input section */}
+          <div className="prompt-input-section">
+            <div className="dual-prompt-input-group">
+              <input
+                type="text"
+                value={leftSide}
+                onChange={(e) => setLeftSide(e.target.value)}
+                onKeyPress={handlePromptKeyPress}
+                placeholder="Small"
+                maxLength={25}
+                className="prompt-side-input"
+              />
+              <span className="vs-divider">vs</span>
+              <input
+                type="text"
+                value={rightSide}
+                onChange={(e) => setRightSide(e.target.value)}
+                onKeyPress={handlePromptKeyPress}
+                placeholder="Big"
+                maxLength={25}
+                className="prompt-side-input"
+              />
+              <button 
+                onClick={submitPrompt} 
+                disabled={!leftSide.trim() || !rightSide.trim()}
+                className="submit-prompt-button"
+              >
+                +
+              </button>
             </div>
           </div>
-          <p className="prompts-hint">
-            Create spectrum concepts like "Hot vs Cold" or "Expensive vs Cheap"
-          </p>
-          <div className="prompts-list">
-            {customPrompts.map((prompt, index) => (
-              <div key={index} className="prompt-input">
-                <input
-                  type="text"
-                  value={prompt}
-                  onChange={(e) => updatePrompt(index, e.target.value)}
-                  placeholder="e.g. Hot vs Cold"
-                  maxLength={50}
-                />
-                {customPrompts.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removePrompt(index)}
-                    className="remove-button"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-          <button onClick={addPrompt} className="add-button">
-            + Add Prompt
-          </button>
+        </div>
+      )}
+
+      {gameMode === 'custom' && ((userPacks.length > 0 || allPlayerPacks.length > 0) || customPrompts.length > 0) && (
+        <div className="pack-buttons-section">
+          {(userPacks.length > 0 || allPlayerPacks.length > 0) && (
+            <select 
+              onChange={(e) => e.target.value && handleLoadFromPack(e.target.value)}
+              value=""
+              className="load-pack-button-compact"
+            >
+              <option value="">📦 Load Pack</option>
+              {/* Current user's packs */}
+              {userPacks.length > 0 && (
+                <optgroup label="Your Packs">
+                  {userPacks.map(pack => (
+                    <option key={pack.id} value={pack.id}>
+                      {pack.name} ({pack.prompts.length})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {/* Other players' packs */}
+              {allPlayerPacks.map(playerGroup => (
+                <optgroup key={playerGroup.username} label={`${playerGroup.username}'s Packs`}>
+                  {playerGroup.packs.map(pack => (
+                    <option key={pack.id} value={pack.id}>
+                      {pack.name} ({pack.prompts.length})
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          )}
+          {customPrompts.length > 0 && (
+            <button
+              onClick={() => setShowPackModal(true)}
+              className="save-pack-button-compact"
+            >
+              💾 Save to Pack
+            </button>
+          )}
         </div>
       )}
 
@@ -269,10 +381,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
           {gameMode === 'custom' && (
             <>
               <div className="info-item">
-                <strong>Custom Prompts:</strong> {customPrompts.filter(p => p.trim()).length}
+                <strong>Custom Prompts:</strong> {customPrompts.length}
               </div>
               <div className="info-item">
-                <strong>Total Rounds:</strong> {Math.max(8, customPrompts.filter(p => p.trim()).length * Math.ceil(8 / Math.max(1, customPrompts.filter(p => p.trim()).length)))}
+                <strong>Total Rounds:</strong> {Math.max(8, customPrompts.length * Math.ceil(8 / Math.max(1, customPrompts.length)))}
               </div>
             </>
           )}
@@ -303,6 +415,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
         onCreatePack={handleCreatePack}
         onAddToExistingPack={handleAddToExistingPack}
         onSetUsername={setCurrentUsername}
+        isRemoteMode={false}
       />
     </div>
   );

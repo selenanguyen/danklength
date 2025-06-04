@@ -33,12 +33,13 @@ export interface GameState {
   targetPosition: number;
   targetWidth: number;
   dialPosition: number;
-  gamePhase: 'setup' | 'player-setup' | 'prompt-voting' | 'psychic' | 'guessing' | 'scoring' | 'ended';
+  gamePhase: 'setup' | 'player-setup' | 'prompt-voting' | 'psychic-announcement' | 'psychic' | 'guessing' | 'scoring' | 'ended';
   psychicClue: string;
   currentRound: number;
   totalRounds: number;
   totalScore: number;
   roundScores: number[];
+  roundClues: string[]; // Store clues from each completed round
   customPrompts?: SpectrumConcept[];
   currentPromptIndex?: number;
   currentPromptUse?: number;

@@ -8,11 +8,13 @@ import './MultiplayerLobby.css';
 interface MultiplayerLobbyProps {
   onBackToLocal: () => void;
   socketInstance: ReturnType<typeof useSocket>;
+  initialConfig?: GameConfig | null;
 }
 
 export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   onBackToLocal,
   socketInstance,
+  initialConfig,
 }) => {
   const { 
     multiplayerState, 
@@ -28,7 +30,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   const [mode, setMode] = useState<'menu' | 'create' | 'join'>('menu');
   const [playerName, setPlayerName] = useState('');
   const [gameCodeInput, setGameCodeInput] = useState('');
-  const [localGameMode, setLocalGameMode] = useState<'normal' | 'custom'>('normal');
+  const [localGameMode, setLocalGameMode] = useState<'normal' | 'custom'>(initialConfig?.mode || 'normal');
   
   // Use shared game mode for non-hosts, local for hosts
   const gameMode = multiplayerState.sharedGameMode || localGameMode;
@@ -65,6 +67,18 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
 
   // Use shared prompts from multiplayer state
   const submittedPrompts = multiplayerState.sharedPrompts;
+
+  // Populate initial prompts from config (only once when component mounts)
+  const [initialPromptsLoaded, setInitialPromptsLoaded] = useState(false);
+  useEffect(() => {
+    if (initialConfig?.customPrompts && !initialPromptsLoaded && multiplayerState.isHost) {
+      // Add each prompt from initial config
+      initialConfig.customPrompts.forEach(prompt => {
+        submitCustomPrompt(prompt);
+      });
+      setInitialPromptsLoaded(true);
+    }
+  }, [initialConfig?.customPrompts, initialPromptsLoaded, multiplayerState.isHost, submitCustomPrompt]);
   
   // Auto-start logic when reaching 8 prompts
   const ROUNDS_FOR_AUTO_START = 8;
@@ -164,12 +178,23 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
 
   const handleLoadFromPack = (packId: string) => {
     const packPrompts = loadPackPrompts(packId);
-    if (packPrompts && multiplayerState.isHost) {
-      // Load prompts one by one for multiplayer synchronization
-      packPrompts.forEach(prompt => {
+    if (packPrompts) {
+      // Filter out duplicates by checking against existing prompts
+      const newUniquePrompts = packPrompts.filter(prompt => {
         const promptString = `${prompt.leftConcept} vs ${prompt.rightConcept}`;
-        submitCustomPrompt(promptString);
+        return !submittedPrompts.includes(promptString);
       });
+      
+      if (newUniquePrompts.length > 0) {
+        // Load prompts one by one for multiplayer synchronization
+        // Both hosts and non-hosts can submit prompts via submitCustomPrompt
+        newUniquePrompts.forEach(prompt => {
+          const promptString = `${prompt.leftConcept} vs ${prompt.rightConcept}`;
+          submitCustomPrompt(promptString);
+        });
+      } else {
+        alert('All prompts from this pack are already added to your game!');
+      }
     }
   };
 
@@ -545,6 +570,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
           onCreatePack={handleCreatePack}
           onAddToExistingPack={handleAddToExistingPack}
           onSetUsername={setCurrentUsername}
+          isRemoteMode={true}
         />
       </div>
     );

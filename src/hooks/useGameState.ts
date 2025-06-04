@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import type { GameState, GameConfig, Player, SpectrumConcept, ScoreResult, GuessVote } from '../types';
+import { useState, useCallback, useEffect } from 'react';
+import type { GameState, GameConfig, Player, SpectrumConcept, ScoreResult, GuessVote, PromptVote } from '../types';
 import { getRandomConcept } from '../data/spectrumConcepts';
 
 const initialGameState: GameState = {
@@ -16,11 +16,26 @@ const initialGameState: GameState = {
   totalRounds: 0,
   totalScore: 0,
   roundScores: [],
+  roundClues: [],
   guessVotes: [],
 };
 
 export const useGameState = () => {
   const [gameState, setGameState] = useState<GameState>(initialGameState);
+
+  // Timer effect for prompt voting countdown
+  useEffect(() => {
+    if (gameState.gamePhase === 'prompt-voting' && (gameState.votingTimeLeft || 0) > 0) {
+      const timer = setTimeout(() => {
+        setGameState(prev => ({
+          ...prev,
+          votingTimeLeft: Math.max(0, (prev.votingTimeLeft || 0) - 1)
+        }));
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.gamePhase, gameState.votingTimeLeft]);
 
   const generateTarget = useCallback((): number => {
     return Math.floor(Math.random() * 101); // 0-100
@@ -62,9 +77,10 @@ export const useGameState = () => {
     }));
   }, []);
 
-  const startNewRound = useCallback(() => {
+  const startNewRound = useCallback((playMode?: 'local' | 'remote') => {
     setGameState(prev => {
       const { gameMode, customPrompts, currentRound, totalRounds, players } = prev;
+      
       
       // Check if game should end (using the incremented round number)
       const nextRound = currentRound + 1;
@@ -87,10 +103,11 @@ export const useGameState = () => {
           currentRound: nextRound,
           currentPsychicIndex: players.length > 0 ? (prev.currentPsychicIndex + 1) % players.length : 0,
           promptVotes: [],
-          votingTimeLeft: 10,
+          votingTimeLeft: 20,
         };
       } else {
-        // For normal mode, select random card and go to psychic phase
+        // For normal mode, determine phase based on play mode
+        const nextPhase = playMode === 'local' ? 'psychic-announcement' : 'psychic';
         const card = getRandomConcept();
         return {
           ...prev,
@@ -98,7 +115,7 @@ export const useGameState = () => {
           targetPosition: target,
           targetWidth,
           dialPosition: 50,
-          gamePhase: 'psychic',
+          gamePhase: nextPhase,
           psychicClue: '',
           currentRound: nextRound,
           currentPsychicIndex: players.length > 0 ? (prev.currentPsychicIndex + 1) % players.length : 0,
@@ -157,10 +174,9 @@ export const useGameState = () => {
     // The visual target in Dial component can be different for better UX
     const adjustedCenter = getAdjustedTargetCenter(targetPos);
     
-    // Calculate distance considering wrapping around the spectrum
-    const straightDistance = Math.abs(dialPos - adjustedCenter);
-    const wrapAroundDistance = 100 - straightDistance; // Distance going the other way around
-    const distance = Math.min(straightDistance, wrapAroundDistance);
+    // Calculate distance using simple absolute difference (no wrapping for semicircle)
+    // For a semicircle spectrum, we don't need wrap-around distance calculation
+    const distance = Math.abs(dialPos - adjustedCenter);
     
     // Total target area should be 25% of the spectrum
     const totalTargetWidth = 25; // 25% of the spectrum (0-100)
@@ -177,8 +193,6 @@ export const useGameState = () => {
       dialPos,
       originalTarget: targetPos,
       adjustedCenter,
-      straightDistance,
-      wrapAroundDistance,
       distance,
       centerZone,
       innerZone,
@@ -219,6 +233,7 @@ export const useGameState = () => {
       
       const newTotalScore = totalScore + result.points;
       const newRoundScores = [...roundScores, result.points];
+      const newRoundClues = [...(prev.roundClues || []), prev.psychicClue];
       
       // Always go to scoring phase first to show the score
       console.log('Transitioning to scoring phase');
@@ -227,6 +242,7 @@ export const useGameState = () => {
         dialPosition: position,
         totalScore: newTotalScore,
         roundScores: newRoundScores,
+        roundClues: newRoundClues,
         gamePhase: 'scoring',
       };
     });
@@ -296,6 +312,7 @@ export const useGameState = () => {
         currentPsychicIndex: 0, // Start with first player
         totalScore: 0,
         roundScores: [],
+        roundClues: [],
       }));
     }
   }, [generateTarget, generateTargetWidth]);
@@ -444,6 +461,177 @@ export const useGameState = () => {
     });
   }, [checkAllPlayersLockedIn]);
 
+  const startPsychicPhase = useCallback(() => {
+    setGameState(prev => ({
+      ...prev,
+      gamePhase: 'psychic',
+    }));
+  }, []);
+
+  // Prompt voting functions for local mode
+  const voteForPromptLocal = useCallback((promptId: string, playerId: string = 'local-player') => {
+    setGameState(prev => {
+      const currentVotes = prev.promptVotes || [];
+      const existingVoteIndex = currentVotes.findIndex(vote => vote.playerId === playerId);
+      
+      let newVotes: PromptVote[];
+      if (existingVoteIndex >= 0) {
+        // Update existing vote
+        newVotes = [...currentVotes];
+        newVotes[existingVoteIndex] = {
+          ...newVotes[existingVoteIndex],
+          promptId,
+          isLockedIn: false, // Changing vote unlocks
+        };
+      } else {
+        // Add new vote
+        newVotes = [...currentVotes, {
+          playerId,
+          promptId,
+          isLockedIn: false,
+        }];
+      }
+      
+      return {
+        ...prev,
+        promptVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const lockInPromptVote = useCallback((playerId: string = 'local-player') => {
+    setGameState(prev => {
+      const currentVotes = prev.promptVotes || [];
+      const existingVoteIndex = currentVotes.findIndex(vote => vote.playerId === playerId);
+      
+      let newVotes: PromptVote[];
+      if (existingVoteIndex >= 0) {
+        // Lock in existing vote
+        newVotes = currentVotes.map(vote => 
+          vote.playerId === playerId 
+            ? { ...vote, isLockedIn: true }
+            : vote
+        );
+      } else {
+        // Create abstention vote (no prompt selected)
+        newVotes = [...currentVotes, {
+          playerId,
+          promptId: '', // Empty string indicates abstention
+          isLockedIn: true,
+        }];
+      }
+      
+      return {
+        ...prev,
+        promptVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const unlockPromptVote = useCallback((playerId: string = 'local-player') => {
+    setGameState(prev => {
+      const currentVotes = prev.promptVotes || [];
+      const newVotes = currentVotes.map(vote => 
+        vote.playerId === playerId 
+          ? { ...vote, isLockedIn: false }
+          : vote
+      );
+      
+      return {
+        ...prev,
+        promptVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const addCustomPromptDuringVoting = useCallback((prompt: string) => {
+    setGameState(prev => {
+      const currentPrompts = prev.customPrompts || [];
+      const newPromptConcept: SpectrumConcept = {
+        id: `custom-voting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        leftConcept: prompt.split(' vs ')[0]?.trim() || 'Left',
+        rightConcept: prompt.split(' vs ')[1]?.trim() || 'Right',
+      };
+      
+      return {
+        ...prev,
+        customPrompts: [...currentPrompts, newPromptConcept],
+      };
+    });
+  }, []);
+
+  const finishPromptVoting = useCallback(() => {
+    setGameState(prev => {
+      // Select the most voted prompt, or a random one if tied/no votes
+      const promptVotes = prev.promptVotes || [];
+      const customPrompts = prev.customPrompts || [];
+      
+      if (customPrompts.length === 0) {
+        return prev; // No prompts to select from
+      }
+      
+      // For single player local mode, if they have a locked vote, use that directly
+      const localPlayerVote = promptVotes.find(vote => vote.playerId === 'local-player' && vote.isLockedIn && vote.promptId !== '');
+      console.log('Local player vote found:', localPlayerVote);
+      
+      if (localPlayerVote) {
+        console.log('Looking for prompt with ID:', localPlayerVote.promptId);
+        const votedPrompt = customPrompts.find(p => p.id === localPlayerVote.promptId);
+        console.log('Found voted prompt:', votedPrompt);
+        
+        if (votedPrompt) {
+          console.log('Using player selected prompt:', votedPrompt);
+          return {
+            ...prev,
+            currentCard: votedPrompt,
+            selectedPromptForRound: votedPrompt,
+            gamePhase: 'psychic-announcement',
+            promptVotes: [], // Clear votes for next round
+          };
+        } else {
+          console.log('ERROR: Could not find prompt with ID in customPrompts array');
+        }
+      } else {
+        console.log('No local player vote found, will use fallback logic');
+      }
+      
+      // Count votes for each prompt (ignore abstentions - empty promptId)
+      const voteCount: { [promptId: string]: number } = {};
+      promptVotes.forEach(vote => {
+        if (vote.isLockedIn && vote.promptId !== '') {
+          voteCount[vote.promptId] = (voteCount[vote.promptId] || 0) + 1;
+        }
+      });
+      
+      // Find prompt with most votes
+      let selectedPrompt = customPrompts[0]; // Default to first prompt
+      let maxVotes = 0;
+      
+      Object.entries(voteCount).forEach(([promptId, votes]) => {
+        if (votes > maxVotes) {
+          maxVotes = votes;
+          const foundPrompt = customPrompts.find(p => p.id === promptId);
+          if (foundPrompt) {
+            selectedPrompt = foundPrompt;
+          }
+        }
+      });
+      
+      // If no votes, select randomly
+      if (maxVotes === 0) {
+        selectedPrompt = customPrompts[Math.floor(Math.random() * customPrompts.length)];
+      }
+      
+      return {
+        ...prev,
+        currentCard: selectedPrompt,
+        selectedPromptForRound: selectedPrompt,
+        gamePhase: 'psychic-announcement',
+        promptVotes: [], // Clear votes for next round
+      };
+    });
+  }, []);
+
   return {
     gameState,
     initializeGame,
@@ -461,5 +649,12 @@ export const useGameState = () => {
     updateGuessVotePosition,
     checkAllPlayersLockedIn,
     lockInRemotePlayerGuess,
+    startPsychicPhase,
+    // Prompt voting functions for local mode
+    voteForPromptLocal,
+    lockInPromptVote,
+    unlockPromptVote,
+    addCustomPromptDuringVoting,
+    finishPromptVoting,
   };
 };
