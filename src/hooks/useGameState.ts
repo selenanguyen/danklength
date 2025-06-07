@@ -352,10 +352,19 @@ export const useGameState = () => {
   }, []);
 
   const syncGameState = useCallback((newGameState: Partial<GameState>) => {
-    setGameState(prev => ({
-      ...prev,
-      ...newGameState,
-    }));
+    console.log('🔄 SYNC DEBUG: syncGameState called with:', newGameState);
+    console.log('🔄 SYNC DEBUG: Is this a definitive sync?', newGameState.isDefinitive);
+    setGameState(prev => {
+      console.log('🔄 SYNC DEBUG: Previous skippedPlayers:', prev.skippedPlayers);
+      console.log('🔄 SYNC DEBUG: New skippedPlayers:', newGameState.skippedPlayers);
+      const updated = {
+        ...prev,
+        ...newGameState,
+      };
+      console.log('🔄 SYNC DEBUG: Final skippedPlayers after sync:', updated.skippedPlayers);
+      console.log('🔄 SYNC DEBUG: Updated state keys:', Object.keys(updated));
+      return updated;
+    });
   }, []);
 
   const lockInGuess = useCallback((playerId: string, playerName: string) => {
@@ -463,12 +472,13 @@ export const useGameState = () => {
     
     console.log('=== LOCK-IN CHECK DEBUG ===');
     console.log('All players:', players.map(p => p.name));
-    console.log('Psychic index:', psychicIndex);
+    console.log('Psychic index:', psychicIndex, 'Psychic name:', players[psychicIndex]?.name);
     console.log('Non-psychic players:', nonPsychicPlayers.map(p => p.name));
-    console.log('Skipped players:', skippedPlayers);
-    console.log('Eligible players:', eligiblePlayers.map(p => p.name));
-    console.log('Locked-in votes:', lockedInVotes.length);
-    console.log('Need votes from:', eligiblePlayers.length);
+    console.log('Skipped players array:', skippedPlayers);
+    console.log('Eligible players (non-psychic, non-skipped):', eligiblePlayers.map(p => p.name));
+    console.log('All guess votes:', guessVotes.map(v => `${v.playerName}: ${v.isLockedIn ? 'LOCKED' : 'unlocked'}`));
+    console.log('Locked-in votes count:', lockedInVotes.length);
+    console.log('Need votes from count:', eligiblePlayers.length);
     console.log('All locked in?', lockedInVotes.length >= eligiblePlayers.length && eligiblePlayers.length > 0);
     
     return lockedInVotes.length >= eligiblePlayers.length && eligiblePlayers.length > 0;

@@ -642,10 +642,17 @@ io.on('connection', (socket) => {
           gamePlayer.isConnected = true;
         }
         
-        // Remove player from skipped list if they were skipped
+        // Check if player was skipped BEFORE clearing them
         const wasSkipped = room.gameState.skippedPlayers && room.gameState.skippedPlayers.includes(playerName);
+        console.log(`SERVER: Player ${playerName} reconnecting. Was skipped: ${wasSkipped}`);
+        console.log(`SERVER: skippedPlayers BEFORE clearing:`, room.gameState.skippedPlayers);
+        
+        // Remove player from skipped list if they were skipped
         if (room.gameState.skippedPlayers) {
+          const originalLength = room.gameState.skippedPlayers.length;
           room.gameState.skippedPlayers = room.gameState.skippedPlayers.filter(name => name !== playerName);
+          console.log(`SERVER: skippedPlayers AFTER clearing:`, room.gameState.skippedPlayers);
+          console.log(`SERVER: Removed ${originalLength - room.gameState.skippedPlayers.length} entries`);
         }
         
         // Clear any skip votes for this player
@@ -658,9 +665,14 @@ io.on('connection', (socket) => {
         
         // Explicitly broadcast updated game state to ensure all clients sync the cleared skip status
         if (wasSkipped) {
-          io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
           console.log(`SERVER: Broadcasting updated game state after clearing skip status for ${playerName}`);
+          console.log(`SERVER: Broadcasting skippedPlayers:`, room.gameState.skippedPlayers);
+          io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
         }
+        
+        // Store the wasSkipped flag and the cleared game state for later use
+        disconnectedPlayer.wasSkipped = wasSkipped;
+        disconnectedPlayer.clearedGameState = wasSkipped ? JSON.parse(JSON.stringify(room.gameState)) : null;
       }
       
       // Add connection notification (this will broadcast to all players)
@@ -674,23 +686,44 @@ io.on('connection', (socket) => {
         disconnectedPlayers: room.players.filter(p => !p.isConnected).map(p => p.name)
       });
       
+      // Check if this player was originally the host (before transfer)
+      const wasOriginalHost = disconnectedPlayer.isHost;
+      
       // If host status changed, notify about host transfer
-      if (disconnectedPlayer.isHost) {
+      if (wasOriginalHost) {
         io.to(room.code).emit('host-transferred', {
           newHostId: socket.id,
           newHostName: playerName,
           room: room,
         });
+        
+        console.log(`SERVER: Original host ${playerName} reconnected, checking if they were skipped`);
+        console.log(`SERVER: Current skippedPlayers:`, room.gameState?.skippedPlayers);
       }
       
       socket.emit('game-joined', { room: room });
       
       // Send current game state if game is in progress
       if (room.gameState && room.isGameStarted) {
+        console.log(`SERVER: Sending game-started to reconnecting player ${playerName}`);
         socket.emit('game-started', {
           gameConfig: room.gameState,
           gameState: room.gameState,
         });
+        
+        // ADDITIONALLY, if this player was skipped, send a definitive sync to override their local state
+        if (disconnectedPlayer.wasSkipped && disconnectedPlayer.clearedGameState) {
+          console.log(`SERVER: Player ${playerName} was skipped, sending additional definitive sync`);
+          console.log(`SERVER: Using stored cleared state with skippedPlayers:`, disconnectedPlayer.clearedGameState.skippedPlayers);
+          console.log(`SERVER: Current room state skippedPlayers (might be corrupted):`, room.gameState.skippedPlayers);
+          // Send after a small delay to ensure game-started is processed first
+          setTimeout(() => {
+            socket.emit('host-reconnect-sync', {
+              gameState: disconnectedPlayer.clearedGameState,
+              isDefinitive: true
+            });
+          }, 100);
+        }
       }
       
       // Send existing custom prompts to the reconnected player
@@ -840,6 +873,14 @@ io.on('connection', (socket) => {
 
     if (!room) return;
 
+    // Get player name for debugging
+    const player = room.players.find(p => p.id === socket.id);
+    const playerName = player?.name || 'Unknown';
+    
+    console.log(`🔥 SERVER: Received game state update from ${playerName}`);
+    console.log(`🔥 SERVER: Current skippedPlayers:`, room.gameState?.skippedPlayers);
+    console.log(`🔥 SERVER: Incoming skippedPlayers:`, gameState?.skippedPlayers);
+
     // During prompt-voting phase, preserve existing promptVotes if incoming state doesn't have them
     if (room.gameState && room.gameState.gamePhase === 'prompt-voting' && 
         gameState.promptVotes === undefined && room.gameState.promptVotes) {
@@ -849,6 +890,8 @@ io.on('connection', (socket) => {
     }
 
     room.gameState = gameState;
+    
+    console.log(`🔥 SERVER: Updated room skippedPlayers:`, room.gameState?.skippedPlayers);
     
     // Broadcast to all other players in room with disconnected players info
     socket.to(room.code).emit('game-state-updated', { 

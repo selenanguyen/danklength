@@ -110,6 +110,12 @@ function App() {
       if (currentPlayerId === data.newHostId) {
         console.log('CLIENT: We just became host (likely reconnected), setting reconnection flag');
         setHostRecentlyReconnected(true);
+        
+        // Also set a backup timeout to clear the flag in case other clearing mechanisms fail
+        setTimeout(() => {
+          console.log('CLIENT: Backup timeout clearing hostRecentlyReconnected flag');
+          setHostRecentlyReconnected(false);
+        }, 5000);
       }
     };
 
@@ -119,6 +125,48 @@ function App() {
       removeEventListener('host-transferred', handleHostTransferred);
     };
   }, [playMode, socketInstance, multiplayerState.currentPlayerId]);
+
+  // Listen for definitive host reconnection sync
+  useEffect(() => {
+    if (playMode !== 'remote') return;
+
+    const handleHostReconnectSync = (...args: unknown[]) => {
+      const data = args[0] as { gameState: any; isDefinitive: boolean };
+      console.log('CLIENT: Received host reconnect sync, forcing full state update');
+      
+      // Force a complete sync of the game state
+      console.log('🔥 CLIENT: Host reconnect sync - Before sync, local skippedPlayers:', gameState.skippedPlayers);
+      console.log('🔥 CLIENT: Host reconnect sync - Server skippedPlayers:', data.gameState.skippedPlayers);
+      console.log('🔥 CLIENT: Host reconnect sync - Full server state:', data.gameState);
+      syncGameState(data.gameState);
+      console.log('🔥 CLIENT: Host reconnect sync - After sync should be updated');
+      
+      // Verify the sync worked by checking again after state update
+      setTimeout(() => {
+        console.log('🔥 CLIENT: Host reconnect sync - Verification check, local skippedPlayers:', gameState.skippedPlayers);
+      }, 100);
+      
+      // Clear reconnection flag since we've now synced
+      setHostRecentlyReconnected(false);
+    };
+
+    const { addEventListener, removeEventListener } = socketInstance;
+    addEventListener('host-reconnect-sync', handleHostReconnectSync);
+    return () => {
+      removeEventListener('host-reconnect-sync', handleHostReconnectSync);
+    };
+  }, [playMode, socketInstance, syncGameState]);
+
+  // Debug: Track changes to skippedPlayers
+  useEffect(() => {
+    console.log('HOST DEBUG: gameState.skippedPlayers changed to:', gameState.skippedPlayers);
+  }, [gameState.skippedPlayers]);
+
+  // Debug: Track host status changes
+  useEffect(() => {
+    const currentPlayerName = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name;
+    console.log(`👑 HOST STATUS: ${currentPlayerName} isHost=${multiplayerState.isHost}`);
+  }, [multiplayerState.isHost, multiplayerState.currentPlayerId, multiplayerState.players]);
 
   // Listen for multiplayer game start events
   useEffect(() => {
@@ -132,33 +180,42 @@ function App() {
   // Listen for game state updates in multiplayer
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.syncedGameState && gameState.gamePhase !== 'setup') {
-      console.log('CLIENT: Received game state update:', multiplayerState.syncedGameState);
-      console.log('CLIENT: Current local skippedPlayers:', gameState.skippedPlayers);
-      console.log('CLIENT: Incoming skippedPlayers:', multiplayerState.syncedGameState.skippedPlayers);
+      const currentPlayerName = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name;
+      console.log(`[${currentPlayerName}] CLIENT: Received game state update:`, multiplayerState.syncedGameState);
+      console.log(`[${currentPlayerName}] CLIENT: Current local skippedPlayers:`, gameState.skippedPlayers);
+      console.log(`[${currentPlayerName}] CLIENT: Incoming skippedPlayers:`, multiplayerState.syncedGameState.skippedPlayers);
       
       if (multiplayerState.isHost) {
-        // Host only syncs connection-related fields to avoid overriding their own game state
-        const connectionFields = {
-          players: multiplayerState.syncedGameState.players,
-          skippedPlayers: multiplayerState.syncedGameState.skippedPlayers
-        };
-        console.log('CLIENT: Host syncing connection fields:', connectionFields);
-        console.log('CLIENT: Host local state BEFORE sync - skippedPlayers:', gameState.skippedPlayers);
-        syncGameState(connectionFields);
-        console.log('CLIENT: Host should now have updated local state');
+        // Check if this is a definitive sync from host reconnection
+        const isDefinitiveSync = multiplayerState.syncedGameState.isDefinitive;
         
-        // If host was just marked as recently reconnected, clear that flag after state sync
-        if (hostRecentlyReconnected) {
-          console.log('CLIENT: Host state synced after reconnection, clearing reconnection flag');
-          setHostRecentlyReconnected(false);
+        if (isDefinitiveSync || hostRecentlyReconnected) {
+          // For definitive syncs or recent reconnections, do FULL state sync
+          console.log(`[${currentPlayerName}] CLIENT: Host doing FULL sync due to definitive sync or recent reconnection`);
+          syncGameState(multiplayerState.syncedGameState);
+          
+          if (hostRecentlyReconnected) {
+            console.log(`[${currentPlayerName}] CLIENT: Host state synced after reconnection, clearing reconnection flag`);
+            setHostRecentlyReconnected(false);
+          }
+        } else {
+          // Normal operation: Host only syncs connection-related fields to avoid overriding their own game state
+          const connectionFields = {
+            players: multiplayerState.syncedGameState.players,
+            skippedPlayers: multiplayerState.syncedGameState.skippedPlayers
+          };
+          console.log(`[${currentPlayerName}] CLIENT: Host syncing connection fields:`, connectionFields);
+          console.log(`[${currentPlayerName}] CLIENT: Host local state BEFORE sync - skippedPlayers:`, gameState.skippedPlayers);
+          syncGameState(connectionFields);
+          console.log(`[${currentPlayerName}] CLIENT: Host should now have updated local state`);
         }
       } else {
         // Non-host players apply the full synced game state
-        console.log('CLIENT: Non-host syncing full game state');
+        console.log(`[${currentPlayerName}] CLIENT: Non-host syncing full game state`);
         syncGameState(multiplayerState.syncedGameState);
       }
     }
-  }, [multiplayerState.syncedGameState, playMode, multiplayerState.isHost, gameState.gamePhase, syncGameState]);
+  }, [multiplayerState.syncedGameState, playMode, multiplayerState.isHost, gameState.gamePhase, hostRecentlyReconnected, syncGameState]);
 
   // Listen for custom prompts updates in multiplayer (host included)
   useEffect(() => {
@@ -172,20 +229,34 @@ function App() {
   // Sync game state changes to other players in multiplayer (for host only)
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase !== 'setup') {
-      console.log('Host syncing game state:', gameState);
+      const currentPlayerName = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name;
+      console.log(`[${currentPlayerName}] Host syncing game state:`, gameState);
       
-      // Don't sync if the host recently reconnected and hasn't synced server state yet
-      if (hostRecentlyReconnected) {
-        console.log('Host recently reconnected and hasn\'t synced server state yet, skipping sync to prevent overriding server state');
-        return;
-      }
-      
-      // Also don't sync if the host's local state has themselves in skippedPlayers - this indicates stale state
+      // Get host info for checks
       const hostPlayerName = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name;
       const hostIsInSkippedList = hostPlayerName && gameState.skippedPlayers?.includes(hostPlayerName);
       
-      if (hostIsInSkippedList) {
-        console.log('Host has stale local state (self in skippedPlayers), skipping sync to prevent overriding server state');
+      // Check if any currently connected player is in the skipped list (indicates stale state)
+      // Only flag as stale if a CONNECTED player is marked as skipped
+      const connectedPlayerNames = multiplayerState.players.filter(p => p.isConnected).map(p => p.name);
+      const disconnectedPlayerNames = multiplayerState.disconnectedPlayers || [];
+      
+      const hasStaleSkippedData = gameState.skippedPlayers?.some(skippedName => {
+        const isConnected = connectedPlayerNames.includes(skippedName);
+        const isDisconnected = disconnectedPlayerNames.includes(skippedName);
+        // Only consider it stale if the player is marked as skipped but is currently connected
+        return isConnected && !isDisconnected;
+      });
+      
+      // AGGRESSIVE prevention: Don't sync if host recently reconnected OR if they're in their own skipped list OR if any connected player is marked as skipped
+      if (hostRecentlyReconnected || hostIsInSkippedList || hasStaleSkippedData) {
+        console.log(`[${currentPlayerName}] Host sync blocked:`);
+        console.log(`  - Recently reconnected: ${hostRecentlyReconnected}`);
+        console.log(`  - Self in skipped list: ${hostIsInSkippedList}`);
+        console.log(`  - Has stale skipped data: ${hasStaleSkippedData}`);
+        console.log(`  - Local skippedPlayers:`, gameState.skippedPlayers);
+        console.log(`  - Connected players:`, connectedPlayerNames);
+        console.log('  Preventing sync to avoid overriding server state');
         return;
       }
       
@@ -891,6 +962,9 @@ function App() {
                       );
                       const isDisconnected = multiplayerState.disconnectedPlayers.includes(player.name);
                       const isSkipped = gameState.skippedPlayers?.includes(player.name);
+                      
+                      // Debug logging for vote status display
+                      console.log(`VOTE STATUS DEBUG - Player: ${player.name}, isSkipped: ${isSkipped}, gameState.skippedPlayers:`, gameState.skippedPlayers);
                       
                       return (
                         <div key={player.id} className={`player-vote-status ${vote?.isLockedIn ? 'locked-in' : 'waiting'} ${isDisconnected ? 'player-status-disconnected' : ''}`}>

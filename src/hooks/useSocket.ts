@@ -100,6 +100,12 @@ const clearCachedGameSession = () => {
 export const useSocket = () => {
   const socketRef = useRef<Socket | null>(null);
   const [multiplayerState, setMultiplayerState] = useState<MultiplayerState>(initialState);
+  const multiplayerStateRef = useRef<MultiplayerState>(multiplayerState);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    multiplayerStateRef.current = multiplayerState;
+  }, [multiplayerState]);
 
   useEffect(() => {
     console.log('Connecting to server:', config.serverUrl);
@@ -253,14 +259,34 @@ export const useSocket = () => {
     });
 
     socket.on('host-transferred', (data) => {
-      console.log('Host transferred:', data);
-      console.log('Current player ID:', socketRef.current?.id);
-      console.log('New host ID:', data.newHostId);
+      console.log('🔄 HOST TRANSFER EVENT RECEIVED:', data);
+      console.log('🔄 Current player ID:', socketRef.current?.id);
+      console.log('🔄 New host ID:', data.newHostId);
+      console.log('🔄 New host name:', data.newHostName);
+      const wasHost = multiplayerStateRef.current.isHost;
+      const isNowHost = socketRef.current?.id === data.newHostId;
+      
+      console.log(`🔄 Host status change: wasHost=${wasHost} → isNowHost=${isNowHost}`);
+      
+      if (wasHost && !isNowHost) {
+        console.log('🚨 I was host but no longer am - stopping state sync');
+      } else if (!wasHost && isNowHost) {
+        console.log('🎉 I am now the host - starting state sync');
+      }
+      
       setMultiplayerState(prev => ({
         ...prev,
-        isHost: socketRef.current?.id === data.newHostId,
+        isHost: isNowHost,
         players: data.room.players, // Use the updated players list from server
         syncedGameState: data.room.gameState || prev.syncedGameState, // Sync game state to preserve cleared skip status
+      }));
+    });
+
+    socket.on('host-reconnect-sync', (data) => {
+      console.log('HOST RECONNECT: Received definitive game state sync:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        syncedGameState: data.gameState,
       }));
     });
 
@@ -290,7 +316,8 @@ export const useSocket = () => {
 
     // Game state synchronization events
     socket.on('game-state-updated', (data) => {
-      console.log('Game state updated:', data);
+      console.log('[SOCKET] game-state-updated received:', data);
+      console.log('[SOCKET] Received skippedPlayers:', data.gameState?.skippedPlayers);
       setMultiplayerState(prev => ({
         ...prev,
         syncedGameState: data.gameState,
