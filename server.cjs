@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Game constants
-const PROMPT_VOTING_TIME_SECONDS = 25;
+const PROMPT_VOTING_TIME_SECONDS = 2000; // temporary TODO change back
 
 // Spectrum concepts data
 const spectrumConcepts = [
@@ -468,7 +468,15 @@ function transitionToScoring(room) {
   // Update game state
   room.gameState.totalScore = (room.gameState.totalScore || 0) + points;
   room.gameState.roundScores = [...(room.gameState.roundScores || []), points];
-  room.gameState.roundClues = [...(room.gameState.roundClues || []), room.gameState.psychicClue || ''];
+  
+  // Store round history with psychic information
+  const currentPsychic = room.gameState.players[room.gameState.currentPsychicIndex];
+  const roundHistory = {
+    clue: room.gameState.psychicClue || '',
+    psychicName: currentPsychic?.name || 'Unknown',
+    psychicIndex: room.gameState.currentPsychicIndex
+  };
+  room.gameState.roundClues = [...(room.gameState.roundClues || []), roundHistory];
   room.gameState.gamePhase = 'scoring';
   
   console.log(`SERVER: Scored ${points} points in zone "${zone}" for room ${room.code}`);

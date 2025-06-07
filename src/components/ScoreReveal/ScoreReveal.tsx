@@ -53,15 +53,30 @@ export const ScoreReveal: React.FC<ScoreRevealProps> = ({ gameState, currentUser
     if (roundIndex >= gameState.roundScores.length) return null;
     
     const score = gameState.roundScores[roundIndex];
-    const psychicIndex = roundIndex % gameState.players.length;
-    const psychic = gameState.players[psychicIndex];
+    const roundClue = gameState.roundClues?.[roundIndex];
     
-    // Get clue from round history if available, otherwise use placeholder
-    const clue = gameState.roundClues?.[roundIndex] || `Round ${roundIndex + 1} clue`;
+    let clue: string;
+    let psychicName: string;
+    
+    if (typeof roundClue === 'string') {
+      // Legacy format: just the clue string, use old logic for psychic
+      clue = roundClue || `Round ${roundIndex + 1} clue`;
+      const psychicIndex = roundIndex % gameState.players.length;
+      psychicName = gameState.players[psychicIndex]?.name || 'Unknown';
+    } else if (roundClue && typeof roundClue === 'object') {
+      // New format: RoundHistory object with psychic info
+      clue = roundClue.clue || `Round ${roundIndex + 1} clue`;
+      psychicName = roundClue.psychicName || 'Unknown';
+    } else {
+      // No clue data available
+      clue = `Round ${roundIndex + 1} clue`;
+      const psychicIndex = roundIndex % gameState.players.length;
+      psychicName = gameState.players[psychicIndex]?.name || 'Unknown';
+    }
     
     return {
       score,
-      psychic: psychic?.name || 'Unknown',
+      psychic: psychicName,
       clue,
       roundNumber: roundIndex + 1
     };

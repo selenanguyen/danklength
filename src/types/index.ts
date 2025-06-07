@@ -24,6 +24,12 @@ export interface GuessVote {
   dialPosition: number;
 }
 
+export interface RoundHistory {
+  clue: string;
+  psychicName: string;
+  psychicIndex: number; // For backwards compatibility
+}
+
 export interface GameState {
   gameId?: string;
   gameMode: 'normal' | 'custom';
@@ -39,7 +45,7 @@ export interface GameState {
   totalRounds: number;
   totalScore: number;
   roundScores: number[];
-  roundClues: string[]; // Store clues from each completed round
+  roundClues: (string | RoundHistory)[]; // Store clues from each completed round - supports both legacy string format and new RoundHistory format
   customPrompts?: SpectrumConcept[];
   currentPromptIndex?: number;
   currentPromptUse?: number;
@@ -48,6 +54,7 @@ export interface GameState {
   selectedPromptForRound?: SpectrumConcept;
   guessVotes?: GuessVote[];
   skippedPlayers?: string[];
+  isDefinitive?: boolean; // Flag for definitive server syncs
 }
 
 export interface ConnectionNotification {

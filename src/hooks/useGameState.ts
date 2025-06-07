@@ -245,7 +245,15 @@ export const useGameState = () => {
       
       const newTotalScore = totalScore + result.points;
       const newRoundScores = [...roundScores, result.points];
-      const newRoundClues = [...(prev.roundClues || []), prev.psychicClue];
+      
+      // Store round history with psychic information
+      const currentPsychic = prev.players[prev.currentPsychicIndex];
+      const roundHistory = {
+        clue: prev.psychicClue || '',
+        psychicName: currentPsychic?.name || 'Unknown',
+        psychicIndex: prev.currentPsychicIndex
+      };
+      const newRoundClues = [...(prev.roundClues || []), roundHistory];
       
       // Always go to scoring phase first to show the score
       console.log('Transitioning to scoring phase');

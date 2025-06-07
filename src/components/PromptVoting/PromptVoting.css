@@ -8,6 +8,12 @@
   align-items: center;
   min-height: 100vh;
   justify-content: flex-start; /* Changed from center to flex-start to prevent overflow */
+  pointer-events: none;
+  z-index: 2;
+}
+
+.prompt-voting > * {
+  pointer-events: auto;
 }
 
 .voting-header {
@@ -87,6 +93,11 @@
   border-radius: 12px;
   border: none; /* Remove any border */
   transition: none; /* Remove transition */
+  pointer-events: none; /* Allow clicks to pass through gaps */
+}
+
+.prompts-gallery > * {
+  pointer-events: auto; /* Re-enable clicks on cards */
 }
 
 /* Remove hover border effect */

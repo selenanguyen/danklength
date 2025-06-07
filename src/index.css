@@ -156,7 +156,7 @@ body::before {
   height: 13px;
   background: #8B4513;
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  z-index: 0;
+  z-index: 3;
   opacity: 0;
   cursor: pointer;
   transition: transform 0.2s ease;
@@ -282,6 +282,11 @@ body::before {
   z-index: 10;
   width: 100%;
   pointer-events: none;
+}
+
+/* Lower z-index during prompt voting to allow poop clicks */
+body:has(.prompt-voting) #root {
+  z-index: 1;
 }
 
 h1 {

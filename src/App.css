@@ -12,10 +12,16 @@
   box-sizing: border-box;
   position: relative;
   z-index: 1;
+  pointer-events: none;
+}
+
+.game-container > * {
+  pointer-events: auto;
 }
 
 .game-container.full-height {
   min-height: 100vh;
+  z-index: 1;
 }
 
 .game-container.compact {
@@ -613,21 +619,27 @@
 
 /* Absolute Game Code Display */
 .absolute-game-code {
-  position: absolute;
+  position: fixed;
   top: 20px;
   right: 20px;
-  z-index: 1000;
+  z-index: 1;
   text-align: right;
   pointer-events: none;
 }
 
 .game-code-display {
-  font-family: 'Arial', 'Helvetica', sans-serif;
+  font-family: 'Courier New', monospace;
   font-size: 16px;
-  font-weight: 800;
-  color: #555;
+  font-weight: bold;
+  color: #666;
   margin-bottom: 4px;
   letter-spacing: 1px;
+}
+
+/* Reduced top margin for game codes inside modal containers */
+.game-controls .game-code-display,
+.game-header .game-code-display {
+  margin-top: -8px;
 }
 
 .player-count-display {
