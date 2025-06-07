@@ -525,19 +525,26 @@
   pointer-events: auto;
   user-select: none;
   transition: transform 0.1s ease;
-  background: none;
+  background: none !important;
   border: none;
   padding: 4px;
   margin: 0;
   line-height: 1;
+  box-shadow: none !important;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .emoji-button:hover {
   transform: scale(1.1);
+  background: none !important;
+  box-shadow: none !important;
 }
 
 .emoji-button:active {
   transform: scale(0.95);
+  background: none !important;
+  box-shadow: none !important;
 }
 
 .falling-emoji {
