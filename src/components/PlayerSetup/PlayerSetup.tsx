@@ -72,7 +72,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({ onStartGame, onBackToM
       setGameMode(initialConfig.mode);
       setAddedPlayers(initialConfig.players);
       if (initialConfig.mode === 'custom' && initialConfig.customPrompts) {
-        setCustomPrompts(initialConfig.customPrompts);
+        const promptStrings = initialConfig.customPrompts.map(prompt => 
+          typeof prompt === 'string' ? prompt : `${prompt.leftConcept} vs ${prompt.rightConcept}`
+        );
+        setCustomPrompts(promptStrings);
       }
     }
   }, [initialConfig]);

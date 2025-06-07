@@ -47,12 +47,27 @@ export interface GameState {
   votingTimeLeft?: number;
   selectedPromptForRound?: SpectrumConcept;
   guessVotes?: GuessVote[];
+  skippedPlayers?: string[];
+}
+
+export interface ConnectionNotification {
+  type: 'connected' | 'disconnected' | 'reconnected';
+  playerName: string;
+  timestamp: number;
+  id?: string;
+}
+
+export interface SkipVoteStatus {
+  playerNameToSkip: string;
+  votesReceived: number;
+  votesNeeded: number;
+  voterNames: string[];
 }
 
 export interface GameConfig {
   mode: 'normal' | 'custom';
   players: string[];
-  customPrompts?: string[];
+  customPrompts?: (string | SpectrumConcept)[];
   packId?: string;
 }
 

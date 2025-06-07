@@ -72,7 +72,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
     if (initialConfig?.customPrompts && !initialPromptsLoaded && multiplayerState.isHost) {
       // Add each prompt from initial config
       initialConfig.customPrompts.forEach(prompt => {
-        submitCustomPrompt(prompt);
+        const promptString = typeof prompt === 'string' ? prompt : `${prompt.leftConcept} vs ${prompt.rightConcept}`;
+        submitCustomPrompt(promptString);
       });
       setInitialPromptsLoaded(true);
     }

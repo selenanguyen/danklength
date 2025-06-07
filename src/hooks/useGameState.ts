@@ -57,11 +57,22 @@ export const useGameState = () => {
     let totalRounds = 8;
 
     if (config.mode === 'custom' && config.customPrompts) {
-      customPrompts = config.customPrompts.map((prompt, index) => ({
-        id: `custom-${index}`,
-        leftConcept: prompt.split(' vs ')[0] || 'Left',
-        rightConcept: prompt.split(' vs ')[1] || 'Right',
-      }));
+      customPrompts = config.customPrompts.map((prompt, index) => {
+        // Handle both string format and SpectrumConcept object format
+        if (typeof prompt === 'string') {
+          return {
+            id: `custom-${index}`,
+            leftConcept: prompt.split(' vs ')[0] || 'Left',
+            rightConcept: prompt.split(' vs ')[1] || 'Right',
+          };
+        } else {
+          // Already a SpectrumConcept object
+          return {
+            ...prompt,
+            id: prompt.id || `custom-${index}`,
+          };
+        }
+      });
       
       const promptsPerPlayer = Math.ceil(totalRounds / customPrompts.length);
       totalRounds = customPrompts.length * promptsPerPlayer;
@@ -267,11 +278,22 @@ export const useGameState = () => {
     let totalRounds = 8;
 
     if (config.mode === 'custom' && config.customPrompts) {
-      customPrompts = config.customPrompts.map((prompt, index) => ({
-        id: `custom-${index}`,
-        leftConcept: prompt.split(' vs ')[0] || 'Left',
-        rightConcept: prompt.split(' vs ')[1] || 'Right',
-      }));
+      customPrompts = config.customPrompts.map((prompt, index) => {
+        // Handle both string format and SpectrumConcept object format
+        if (typeof prompt === 'string') {
+          return {
+            id: `custom-${index}`,
+            leftConcept: prompt.split(' vs ')[0] || 'Left',
+            rightConcept: prompt.split(' vs ')[1] || 'Right',
+          };
+        } else {
+          // Already a SpectrumConcept object
+          return {
+            ...prompt,
+            id: prompt.id || `custom-${index}`,
+          };
+        }
+      });
       
       const promptsPerPlayer = Math.ceil(totalRounds / customPrompts.length);
       totalRounds = customPrompts.length * promptsPerPlayer;
@@ -414,14 +436,42 @@ export const useGameState = () => {
     });
   }, []);
 
-  const checkAllPlayersLockedIn = useCallback((players: Player[], psychicIndex: number, guessVotes: GuessVote[]) => {
+  const unlockAllPlayerGuesses = useCallback(() => {
+    setGameState(prev => {
+      const currentVotes = prev.guessVotes || [];
+      const newVotes = currentVotes.map(vote => ({
+        ...vote,
+        isLockedIn: false
+      }));
+      
+      return {
+        ...prev,
+        guessVotes: newVotes,
+      };
+    });
+  }, []);
+
+  const checkAllPlayersLockedIn = useCallback((players: Player[], psychicIndex: number, guessVotes: GuessVote[], skippedPlayers: string[] = []) => {
     // Get non-psychic players
     const nonPsychicPlayers = players.filter((_, index) => index !== psychicIndex);
     
-    // Check if all non-psychic players have locked in votes
+    // Further filter out skipped players
+    const eligiblePlayers = nonPsychicPlayers.filter(player => !skippedPlayers.includes(player.name));
+    
+    // Check if all eligible (non-psychic, non-skipped) players have locked in votes
     const lockedInVotes = guessVotes.filter(vote => vote.isLockedIn);
     
-    return lockedInVotes.length >= nonPsychicPlayers.length && nonPsychicPlayers.length > 0;
+    console.log('=== LOCK-IN CHECK DEBUG ===');
+    console.log('All players:', players.map(p => p.name));
+    console.log('Psychic index:', psychicIndex);
+    console.log('Non-psychic players:', nonPsychicPlayers.map(p => p.name));
+    console.log('Skipped players:', skippedPlayers);
+    console.log('Eligible players:', eligiblePlayers.map(p => p.name));
+    console.log('Locked-in votes:', lockedInVotes.length);
+    console.log('Need votes from:', eligiblePlayers.length);
+    console.log('All locked in?', lockedInVotes.length >= eligiblePlayers.length && eligiblePlayers.length > 0);
+    
+    return lockedInVotes.length >= eligiblePlayers.length && eligiblePlayers.length > 0;
   }, []);
 
   const lockInRemotePlayerGuess = useCallback((playerId: string, playerName: string, position: number) => {
@@ -447,7 +497,7 @@ export const useGameState = () => {
         }
         
         // Check if all players are now locked in
-        const allLockedIn = checkAllPlayersLockedIn(prev.players, prev.currentPsychicIndex, updatedVotes);
+        const allLockedIn = checkAllPlayersLockedIn(prev.players, prev.currentPsychicIndex, updatedVotes, prev.skippedPlayers);
         
         const newState = {
           ...prev,
@@ -648,6 +698,7 @@ export const useGameState = () => {
     lockInGuess,
     unlockGuess,
     updateGuessVotePosition,
+    unlockAllPlayerGuesses,
     checkAllPlayersLockedIn,
     lockInRemotePlayerGuess,
     startPsychicPhase,

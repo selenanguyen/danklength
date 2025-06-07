@@ -25,7 +25,7 @@ function App() {
     calculateScore,
     syncGameState,
     lockInGuess,
-    updateGuessVotePosition,
+    unlockAllPlayerGuesses,
     checkAllPlayersLockedIn,
     lockInRemotePlayerGuess,
     startPsychicPhase,
@@ -37,12 +37,13 @@ function App() {
   } = useGameState();
 
   const socketInstance = useSocket();
-  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction, voteForPrompt, lockInVote, nextRound, resetGameKeepRoom } = socketInstance;
+  const { multiplayerState, updateGameState, reconnectToGame, getCachedGameSession, sendPlayerAction, voteForPrompt, lockInVote, nextRound, resetGameKeepRoom, voteToSkipPlayer } = socketInstance;
 
   const [clueInput, setClueInput] = useState('');
   const [playMode, setPlayMode] = useState<'local' | 'remote' | null>(null);
   const [lastGameConfig, setLastGameConfig] = useState<GameConfig | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [hostRecentlyReconnected, setHostRecentlyReconnected] = useState(false);
 
   // Emoji reaction system
   const [fallingEmojis, setFallingEmojis] = useState<Array<{
@@ -97,6 +98,28 @@ function App() {
     };
   }, [playMode, socketInstance, createFallingEmoji]);
 
+  // Listen for host transfer events to detect when original host reconnects
+  useEffect(() => {
+    if (playMode !== 'remote') return;
+
+    const handleHostTransferred = (...args: unknown[]) => {
+      const data = args[0] as { newHostId: string; newHostName: string };
+      const currentPlayerId = multiplayerState.currentPlayerId;
+      
+      // If we (the current player) just became host, mark as recently reconnected
+      if (currentPlayerId === data.newHostId) {
+        console.log('CLIENT: We just became host (likely reconnected), setting reconnection flag');
+        setHostRecentlyReconnected(true);
+      }
+    };
+
+    const { addEventListener, removeEventListener } = socketInstance;
+    addEventListener('host-transferred', handleHostTransferred);
+    return () => {
+      removeEventListener('host-transferred', handleHostTransferred);
+    };
+  }, [playMode, socketInstance, multiplayerState.currentPlayerId]);
+
   // Listen for multiplayer game start events
   useEffect(() => {
     if (multiplayerState.gameStarted && multiplayerState.gameConfig) {
@@ -106,12 +129,34 @@ function App() {
     }
   }, [multiplayerState.gameStarted, multiplayerState.gameConfig, multiplayerState.syncedGameState, initializeAndStartGame]);
 
-  // Listen for game state updates in multiplayer (non-host only)
+  // Listen for game state updates in multiplayer
   useEffect(() => {
-    if (playMode === 'remote' && !multiplayerState.isHost && multiplayerState.syncedGameState && gameState.gamePhase !== 'setup') {
-      console.log('Received game state update:', multiplayerState.syncedGameState);
-      // Apply the synced game state updates
-      syncGameState(multiplayerState.syncedGameState);
+    if (playMode === 'remote' && multiplayerState.syncedGameState && gameState.gamePhase !== 'setup') {
+      console.log('CLIENT: Received game state update:', multiplayerState.syncedGameState);
+      console.log('CLIENT: Current local skippedPlayers:', gameState.skippedPlayers);
+      console.log('CLIENT: Incoming skippedPlayers:', multiplayerState.syncedGameState.skippedPlayers);
+      
+      if (multiplayerState.isHost) {
+        // Host only syncs connection-related fields to avoid overriding their own game state
+        const connectionFields = {
+          players: multiplayerState.syncedGameState.players,
+          skippedPlayers: multiplayerState.syncedGameState.skippedPlayers
+        };
+        console.log('CLIENT: Host syncing connection fields:', connectionFields);
+        console.log('CLIENT: Host local state BEFORE sync - skippedPlayers:', gameState.skippedPlayers);
+        syncGameState(connectionFields);
+        console.log('CLIENT: Host should now have updated local state');
+        
+        // If host was just marked as recently reconnected, clear that flag after state sync
+        if (hostRecentlyReconnected) {
+          console.log('CLIENT: Host state synced after reconnection, clearing reconnection flag');
+          setHostRecentlyReconnected(false);
+        }
+      } else {
+        // Non-host players apply the full synced game state
+        console.log('CLIENT: Non-host syncing full game state');
+        syncGameState(multiplayerState.syncedGameState);
+      }
     }
   }, [multiplayerState.syncedGameState, playMode, multiplayerState.isHost, gameState.gamePhase, syncGameState]);
 
@@ -128,13 +173,29 @@ function App() {
   useEffect(() => {
     if (playMode === 'remote' && multiplayerState.isHost && gameState.gamePhase !== 'setup') {
       console.log('Host syncing game state:', gameState);
+      
+      // Don't sync if the host recently reconnected and hasn't synced server state yet
+      if (hostRecentlyReconnected) {
+        console.log('Host recently reconnected and hasn\'t synced server state yet, skipping sync to prevent overriding server state');
+        return;
+      }
+      
+      // Also don't sync if the host's local state has themselves in skippedPlayers - this indicates stale state
+      const hostPlayerName = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name;
+      const hostIsInSkippedList = hostPlayerName && gameState.skippedPlayers?.includes(hostPlayerName);
+      
+      if (hostIsInSkippedList) {
+        console.log('Host has stale local state (self in skippedPlayers), skipping sync to prevent overriding server state');
+        return;
+      }
+      
       // Don't sync promptVotes during voting phase - those are managed by voting system
       const stateToSync = gameState.gamePhase === 'prompt-voting' 
         ? { ...gameState, promptVotes: undefined }
         : gameState;
       updateGameState(stateToSync);
     }
-  }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, gameState.psychicClue, updateGameState]);
+  }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, gameState.psychicClue, gameState.skippedPlayers, multiplayerState.players, multiplayerState.currentPlayerId, hostRecentlyReconnected, updateGameState]);
 
   // Handle automatic progression from prompt voting in local mode
   useEffect(() => {
@@ -184,6 +245,10 @@ function App() {
         console.log('Received dial update:', data);
         // Update dial position for all players in real-time
         updateDialPosition(data.position);
+        // Unlock all players when ANY player moves the dial
+        if (gameState.gamePhase === 'guessing') {
+          unlockAllPlayerGuesses();
+        }
       };
 
       const { addEventListener, removeEventListener } = socketInstance;
@@ -193,7 +258,7 @@ function App() {
         removeEventListener('dial-updated', handleDialUpdate);
       };
     }
-  }, [playMode, socketInstance, updateDialPosition]);
+  }, [playMode, socketInstance, updateDialPosition, unlockAllPlayerGuesses, gameState.gamePhase]);
 
   // Listen for player actions (like lock-in-guess) - host only
   useEffect(() => {
@@ -390,7 +455,7 @@ function App() {
     }
     
     // Check if all non-psychic players have locked in
-    const allLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, updatedVotes);
+    const allLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, updatedVotes, gameState.skippedPlayers);
     
     if (allLockedIn || playMode === 'local') {
       // All players locked in or local mode - submit the guess
@@ -450,6 +515,24 @@ function App() {
   if (playMode === 'remote' && gameState.gamePhase === 'setup') {
     return (
       <div className="game-container compact">
+        {/* Connection Notifications - positioned relative to container */}
+        {multiplayerState.connectionNotifications.length > 0 && (
+          <div className="connection-notifications">
+            {multiplayerState.connectionNotifications.map((notification) => (
+              <div 
+                key={notification.id}
+                className={`notification notification-${notification.type}`}
+              >
+                <span className="notification-text">
+                  {notification.playerName} {notification.type === 'connected' ? 'connected' : 
+                    notification.type === 'disconnected' ? 'disconnected' : 're-connected'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+
         <MultiplayerLobby 
           onBackToLocal={handleBackToWelcome}
           socketInstance={socketInstance}
@@ -483,6 +566,33 @@ function App() {
 
     return (
       <div className="game-container full-height">
+        {/* Connection Notifications - positioned relative to container */}
+        {playMode === 'remote' && multiplayerState.connectionNotifications.length > 0 && (
+          <div className="connection-notifications">
+            {multiplayerState.connectionNotifications.map((notification) => (
+              <div 
+                key={notification.id}
+                className={`notification notification-${notification.type}`}
+              >
+                <span className="notification-text">
+                  {notification.playerName} {notification.type === 'connected' ? 'connected' : 
+                    notification.type === 'disconnected' ? 'disconnected' : 're-connected'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Game Code - positioned relative to container */}
+        {playMode === 'remote' && multiplayerState.gameCode && (
+          <div className="absolute-game-code">
+            <div className="game-code-display">Code: {multiplayerState.gameCode}</div>
+            <div className="player-count-display">
+              {multiplayerState.players.filter(p => p.isConnected).length} players active
+            </div>
+          </div>
+        )}
+
         <PromptVoting
           customPrompts={customPrompts}
           promptVotes={promptVotes}
@@ -643,26 +753,10 @@ function App() {
           // Update local position
           updateDialPosition(position);
           
-          // Handle guess vote tracking
+          // Handle guess vote tracking and unlocking
           if (gameState.gamePhase === 'guessing') {
-            let currentPlayerId: string;
-            let currentPlayerName: string;
-            
-            if (playMode === 'remote') {
-              const currentMultiplayerPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId);
-              if (currentMultiplayerPlayer) {
-                currentPlayerId = currentMultiplayerPlayer.id;
-                currentPlayerName = currentMultiplayerPlayer.name;
-                
-                // Update this player's vote position and unlock if they were locked in
-                updateGuessVotePosition(currentPlayerId, currentPlayerName, position);
-              }
-            } else {
-              // For local mode, track position for all guessers
-              currentPlayerId = 'local-guesser';
-              currentPlayerName = 'Local Players';
-              updateGuessVotePosition(currentPlayerId, currentPlayerName, position);
-            }
+            // Unlock ALL players when ANY player moves the dial
+            unlockAllPlayerGuesses();
           }
           
           // Send to other players in multiplayer mode
@@ -673,7 +767,7 @@ function App() {
         }}
         disabled={gameState.gamePhase === 'scoring' || 
                   (gameState.gamePhase === 'guessing' && playMode === 'remote' && isCurrentPlayerPsychic) ||
-                  (gameState.gamePhase === 'guessing' && playMode === 'remote' && checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []))}
+                  (gameState.gamePhase === 'guessing' && playMode === 'remote' && checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || [], gameState.skippedPlayers))}
         hidePointer={false}
         hideForNonPsychic={gameState.gamePhase === 'psychic' && !isCurrentPlayerPsychic}
         isPsychicPhase={gameState.gamePhase === 'psychic' && isCurrentPlayerPsychic}
@@ -681,6 +775,33 @@ function App() {
       />
 
       <div className="game-controls">
+        {/* Connection Notifications - positioned relative to game controls */}
+        {playMode === 'remote' && multiplayerState.connectionNotifications.length > 0 && (
+          <div className="connection-notifications">
+            {multiplayerState.connectionNotifications.map((notification) => (
+              <div 
+                key={notification.id}
+                className={`notification notification-${notification.type}`}
+              >
+                <span className="notification-text">
+                  {notification.playerName} {notification.type === 'connected' ? 'connected' : 
+                    notification.type === 'disconnected' ? 'disconnected' : 're-connected'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Game Code - positioned relative to game controls */}
+        {playMode === 'remote' && multiplayerState.gameCode && gameState.gamePhase !== 'setup' && (
+          <div className="absolute-game-code">
+            <div className="game-code-display">Code: {multiplayerState.gameCode}</div>
+            <div className="player-count-display">
+              {multiplayerState.players.filter(p => p.isConnected).length} players active
+            </div>
+          </div>
+        )}
+
         {gameState.gamePhase === 'psychic' && (
           <div className="psychic-phase">
             <h3>🔮 {currentPlayer?.name}'s Turn</h3>
@@ -691,7 +812,7 @@ function App() {
                 {isCurrentPlayerPsychic ? ' (You!)' : ''}
               </p>
             )}
-            
+
             {isCurrentPlayerPsychic ? (
               <>
                 <p>Give your team a clue for where the target is on this spectrum:</p>
@@ -709,7 +830,38 @@ function App() {
                 </div>
               </>
             ) : (
-              <p>Waiting for {currentPlayer?.name} to give a clue...</p>
+              <>
+                {/* Show different message based on whether psychic is disconnected */}
+                {playMode === 'remote' && currentPlayer && multiplayerState.disconnectedPlayers.includes(currentPlayer.name) ? (
+                  <p style={{ color: '#e74c3c', fontWeight: 'bold' }}>
+                    🔌 {currentPlayer.name} is disconnected and cannot give a clue.
+                  </p>
+                ) : (
+                  <p>Waiting for {currentPlayer?.name} to give a clue...</p>
+                )}
+                
+                {/* Skip button - shown inline when psychic is disconnected */}
+                {playMode === 'remote' && currentPlayer && multiplayerState.disconnectedPlayers.includes(currentPlayer.name) && (
+                  <div style={{ marginTop: '10px' }}>
+                    {multiplayerState.skipVoteStatus?.playerNameToSkip === currentPlayer.name && (
+                      <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+                        Skip votes: {multiplayerState.skipVoteStatus.votesReceived}/{multiplayerState.skipVoteStatus.votesNeeded}
+                      </div>
+                    )}
+                    <button 
+                      className="skip-button"
+                      onClick={() => voteToSkipPlayer(currentPlayer.name)}
+                      disabled={multiplayerState.skipVoteStatus?.voterNames.includes(
+                        multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name || ''
+                      )}
+                    >
+                      {multiplayerState.skipVoteStatus?.voterNames.includes(
+                        multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name || ''
+                      ) ? 'Vote Recorded' : `Skip ${currentPlayer.name}'s Turn`}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -720,24 +872,77 @@ function App() {
             <p><strong>Clue:</strong> "{gameState.psychicClue}"</p>
             
             {/* Show voting status for multiplayer */}
-            {playMode === 'remote' && gameState.guessVotes && gameState.guessVotes.length > 0 && (
+            {playMode === 'remote' && (
               <div className="voting-status">
                 <h4>Player Status:</h4>
                 <div className="player-votes">
                   {gameState.players
                     .filter((_, index) => index !== gameState.currentPsychicIndex)
+                    .filter((player) => {
+                      const isDisconnected = multiplayerState.disconnectedPlayers.includes(player.name);
+                      const isSkipped = gameState.skippedPlayers?.includes(player.name);
+                      // Hide players who are both disconnected and skipped
+                      return !(isDisconnected && isSkipped);
+                    })
                     .map((player) => {
                       const vote = gameState.guessVotes?.find(v => 
                         gameState.players.find(p => p.name === player.name && 
                           (v.playerId === multiplayerState.players.find(mp => mp.name === p.name)?.id || v.playerId.includes(p.name)))
                       );
+                      const isDisconnected = multiplayerState.disconnectedPlayers.includes(player.name);
+                      const isSkipped = gameState.skippedPlayers?.includes(player.name);
+                      
                       return (
-                        <div key={player.id} className={`player-vote-status ${vote?.isLockedIn ? 'locked-in' : 'waiting'}`}>
-                          {player.name}: {vote?.isLockedIn ? '✅ Locked In' : '⏳ Thinking...'}
+                        <div key={player.id} className={`player-vote-status ${vote?.isLockedIn ? 'locked-in' : 'waiting'} ${isDisconnected ? 'player-status-disconnected' : ''}`}>
+                          {player.name}: {
+                            isSkipped ? '⏭️ Skipped' :
+                            isDisconnected ? '🔌 Disconnected' :
+                            vote?.isLockedIn ? '✅ Locked In' : '⏳ Thinking...'
+                          }
                         </div>
                       );
                     })}
                 </div>
+                
+                {/* Skip interface for disconnected guessers */}
+                {(() => {
+                  const disconnectedGuessers = multiplayerState.disconnectedPlayers.filter(name => {
+                    const playerIndex = gameState.players.findIndex(p => p.name === name);
+                    return playerIndex !== gameState.currentPsychicIndex && !gameState.skippedPlayers?.includes(name);
+                  });
+                  
+                  if (disconnectedGuessers.length === 0) return null;
+                  
+                  return (
+                    <div className="disconnected-guessers-single">
+                      <p style={{ color: '#e74c3c', fontWeight: 'bold', marginTop: '20px', marginBottom: '8px' }}>
+                        🔌 {disconnectedGuessers.length} player(s) disconnected and cannot vote.
+                      </p>
+                      {multiplayerState.skipVoteStatus && (
+                        <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
+                          Skip votes: {multiplayerState.skipVoteStatus.votesReceived}/{multiplayerState.skipVoteStatus.votesNeeded}
+                        </div>
+                      )}
+                      <button 
+                        className="skip-button"
+                        style={{ marginTop: '12px' }}
+                        onClick={() => {
+                          // Vote to skip the first disconnected guesser (they'll all be skipped together)
+                          if (disconnectedGuessers.length > 0) {
+                            voteToSkipPlayer(disconnectedGuessers[0]);
+                          }
+                        }}
+                        disabled={multiplayerState.skipVoteStatus?.voterNames.includes(
+                          multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name || ''
+                        )}
+                      >
+                        {multiplayerState.skipVoteStatus?.voterNames.includes(
+                          multiplayerState.players.find(p => p.id === multiplayerState.currentPlayerId)?.name || ''
+                        ) ? 'Vote Recorded' : `Skip Disconnected Player${disconnectedGuessers.length > 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
             
@@ -776,16 +981,13 @@ function App() {
                     // Remote mode: complex voting logic
                     const currentPlayerVote = gameState.guessVotes?.find(vote => vote.playerId === currentPlayerId);
                     const isLockedIn = currentPlayerVote?.isLockedIn || false;
-                    const allPlayersLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || []);
+                    const allPlayersLockedIn = checkAllPlayersLockedIn(gameState.players, gameState.currentPsychicIndex, gameState.guessVotes || [], gameState.skippedPlayers);
                     
                     if (allPlayersLockedIn) {
                       return <p>🔒 All players have locked in their guesses! Calculating score...</p>;
                     } else if (isLockedIn) {
                       return (
-                        <>
-                          <p>✅ You've locked in your guess! Waiting for other players...</p>
-                          <p><em>Move the dial to unlock and change your guess.</em></p>
-                        </>
+                        <p><em>Move the dial to unlock and change your guess.</em></p>
                       );
                     } else {
                       return (
@@ -880,6 +1082,7 @@ function App() {
         ))}
       </div>
     )}
+
     </>
   );
 }

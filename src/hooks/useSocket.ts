@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { GameState, GameConfig, Player, PromptVote } from '../types';
+import type { GameState, GameConfig, Player, PromptVote, ConnectionNotification, SkipVoteStatus } from '../types';
 import { config } from '../config';
 import { PROMPT_VOTING_TIME_SECONDS } from '../constants';
 
@@ -33,6 +33,9 @@ export interface MultiplayerState {
   sharedGameMode: 'normal' | 'custom' | null;
   promptVotes: PromptVote[];
   votingTimeLeft: number;
+  connectionNotifications: ConnectionNotification[];
+  skipVoteStatus: SkipVoteStatus | null;
+  disconnectedPlayers: string[];
 }
 
 const initialState: MultiplayerState = {
@@ -49,6 +52,9 @@ const initialState: MultiplayerState = {
   sharedGameMode: null,
   promptVotes: [],
   votingTimeLeft: 0,
+  connectionNotifications: [],
+  skipVoteStatus: null,
+  disconnectedPlayers: [],
 };
 
 // Helper functions for localStorage cache
@@ -195,11 +201,18 @@ export const useSocket = () => {
       if (currentPlayer) {
         saveGameSession(data.room.code, currentPlayer.name, currentPlayer.isHost);
       }
+      console.log('Game joined event:', { 
+        gameCode: data.room.code, 
+        currentPlayer, 
+        allPlayers: data.room.players.map((p: Player) => ({ name: p.name, id: p.id, isHost: p.isHost, isConnected: p.isConnected }))
+      });
       setMultiplayerState(prev => ({
         ...prev,
         gameCode: data.room.code,
-        isHost: false,
+        isHost: currentPlayer?.isHost || false, // Use actual host status from server
+        currentPlayerId: socket.id || null, // Ensure currentPlayerId is set
         players: data.room.players,
+        gameStarted: data.room.isGameStarted || false, // Set game started status for reconnection
       }));
     });
 
@@ -217,6 +230,16 @@ export const useSocket = () => {
       }));
     });
 
+    socket.on('player-reconnected', (data) => {
+      console.log('Player reconnected:', data.player?.name || data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        players: data.room.players,
+        syncedGameState: data.gameState,
+        disconnectedPlayers: data.disconnectedPlayers || []
+      }));
+    });
+
     socket.on('player-disconnected', (data) => {
       console.log('Player disconnected:', data);
       setMultiplayerState(prev => ({
@@ -229,14 +252,6 @@ export const useSocket = () => {
       }));
     });
 
-    socket.on('player-reconnected', (data) => {
-      console.log('Player reconnected:', data);
-      setMultiplayerState(prev => ({
-        ...prev,
-        players: data.room.players,
-      }));
-    });
-
     socket.on('host-transferred', (data) => {
       console.log('Host transferred:', data);
       console.log('Current player ID:', socketRef.current?.id);
@@ -245,6 +260,7 @@ export const useSocket = () => {
         ...prev,
         isHost: socketRef.current?.id === data.newHostId,
         players: data.room.players, // Use the updated players list from server
+        syncedGameState: data.room.gameState || prev.syncedGameState, // Sync game state to preserve cleared skip status
       }));
     });
 
@@ -258,6 +274,12 @@ export const useSocket = () => {
     // Game started event - notify when host starts the game
     socket.on('game-started', (data) => {
       console.log('Game started event received:', data);
+      console.log('Current multiplayer state before game-started:', {
+        isConnected: multiplayerState.isConnected,
+        gameCode: multiplayerState.gameCode,
+        currentPlayerId: multiplayerState.currentPlayerId,
+        gameStarted: multiplayerState.gameStarted
+      });
       setMultiplayerState(prev => ({
         ...prev,
         gameStarted: true,
@@ -272,6 +294,7 @@ export const useSocket = () => {
       setMultiplayerState(prev => ({
         ...prev,
         syncedGameState: data.gameState,
+        disconnectedPlayers: data.disconnectedPlayers || [],
       }));
     });
 
@@ -373,6 +396,42 @@ export const useSocket = () => {
       }));
     });
 
+    // Handle connection notifications
+    socket.on('connection-notification', (data) => {
+      console.log('Connection notification:', data);
+      
+      // Add the new notification
+      const newNotification = {
+        type: data.type,
+        playerName: data.playerName,
+        timestamp: data.timestamp,
+        id: `${data.playerName}-${data.timestamp}` // Unique ID for tracking
+      };
+      
+      setMultiplayerState(prev => ({
+        ...prev,
+        connectionNotifications: [...prev.connectionNotifications, newNotification],
+      }));
+      
+      // Auto-remove after 3 seconds
+      setTimeout(() => {
+        setMultiplayerState(prev => ({
+          ...prev,
+          connectionNotifications: prev.connectionNotifications.filter(n => n.id !== newNotification.id),
+        }));
+      }, 3000);
+    });
+
+    // Handle skip vote updates
+    socket.on('skip-vote-update', (data) => {
+      console.log('Skip vote update:', data);
+      setMultiplayerState(prev => ({
+        ...prev,
+        skipVoteStatus: data.clear ? null : data,
+      }));
+    });
+
+
     return () => {
       socket.disconnect();
     };
@@ -459,6 +518,9 @@ export const useSocket = () => {
       syncedGameState: null,
       promptVotes: [],
       votingTimeLeft: 0,
+      connectionNotifications: [],
+      skipVoteStatus: null,
+      disconnectedPlayers: [],
     }));
   };
 
@@ -558,6 +620,15 @@ export const useSocket = () => {
     }
   };
 
+  const voteToSkipPlayer = (playerNameToSkip: string) => {
+    if (socketRef.current && multiplayerState.gameCode) {
+      socketRef.current.emit('vote-to-skip-player', {
+        gameCode: multiplayerState.gameCode,
+        playerNameToSkip,
+      });
+    }
+  };
+
   return {
     multiplayerState,
     createGame,
@@ -581,5 +652,6 @@ export const useSocket = () => {
     unlockVote,
     submitCustomPromptDuringVoting,
     nextRound,
+    voteToSkipPlayer,
   };
 };

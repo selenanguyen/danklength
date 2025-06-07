@@ -304,6 +304,210 @@ setInterval(cleanupOldRooms, 60 * 60 * 1000);
 // Voting timers storage
 const votingTimers = new Map();
 
+// Skip vote tracking - tracks which players want to skip disconnected players
+const skipVotes = new Map(); // Map<gameCode, Map<disconnectedPlayerName, Set<voterSocketId>>>
+
+// Connection notifications queue for UI display
+const connectionNotifications = new Map(); // Map<gameCode, Array<{type, playerName, timestamp}>>
+
+// Helper function to add connection notification
+function addConnectionNotification(gameCode, type, playerName) {
+  if (!connectionNotifications.has(gameCode)) {
+    connectionNotifications.set(gameCode, []);
+  }
+  
+  const notifications = connectionNotifications.get(gameCode);
+  notifications.push({
+    type, // 'connected', 'disconnected', 'reconnected'
+    playerName,
+    timestamp: Date.now()
+  });
+  
+  // Keep only last 10 notifications
+  if (notifications.length > 10) {
+    notifications.splice(0, notifications.length - 10);
+  }
+  
+  // Broadcast to all players in room - send only the new notification
+  io.to(gameCode).emit('connection-notification', {
+    type,
+    playerName,
+    timestamp: Date.now()
+  });
+}
+
+// Helper function to check if player can be skipped
+function canSkipPlayer(room, playerName) {
+  const connectedPlayers = room.players.filter(p => p.isConnected);
+  return connectedPlayers.length >= 2; // Need at least 2 connected players to skip
+}
+
+// Helper function to check if all eligible players voted to skip
+function checkSkipVotes(gameCode, disconnectedPlayerName) {
+  const room = gameRooms.get(gameCode);
+  if (!room) return false;
+  
+  const connectedPlayers = room.players.filter(p => p.isConnected);
+  if (connectedPlayers.length < 2) return false; // Need at least 2 players
+  
+  // Calculate eligible voters: connected players who are not the one being skipped
+  const eligibleVoters = connectedPlayers.filter(p => p.name !== disconnectedPlayerName);
+  
+  const skipMap = skipVotes.get(gameCode);
+  if (!skipMap || !skipMap.has(disconnectedPlayerName)) return false;
+  
+  const votersForSkip = skipMap.get(disconnectedPlayerName);
+  return votersForSkip.size >= eligibleVoters.length;
+}
+
+// Helper function to clear skip votes for a player (when they reconnect)
+function clearSkipVotes(gameCode, playerName) {
+  const skipMap = skipVotes.get(gameCode);
+  if (skipMap) {
+    skipMap.delete(playerName);
+    if (skipMap.size === 0) {
+      skipVotes.delete(gameCode);
+    }
+    // Broadcast updated skip vote status
+    broadcastSkipVoteStatus(gameCode);
+  }
+}
+
+// Helper function to clear all skip votes for a game (when round changes)
+function clearAllSkipVotes(gameCode) {
+  skipVotes.delete(gameCode);
+  // Broadcast that skip votes are cleared
+  broadcastSkipVoteStatus(gameCode);
+}
+
+// Helper function to broadcast current skip vote status
+function broadcastSkipVoteStatus(gameCode) {
+  const room = gameRooms.get(gameCode);
+  if (!room) return;
+  
+  const skipMap = skipVotes.get(gameCode);
+  if (!skipMap || skipMap.size === 0) {
+    // No active skip votes
+    io.to(gameCode).emit('skip-vote-update', { clear: true });
+    return;
+  }
+  
+  // Broadcast status for each player being voted on
+  for (const [playerName, voterIds] of skipMap.entries()) {
+    const connectedPlayers = room.players.filter(p => p.isConnected);
+    // Calculate eligible voters: connected players who are not the one being skipped
+    const eligibleVoters = connectedPlayers.filter(p => p.name !== playerName);
+    
+    io.to(gameCode).emit('skip-vote-update', {
+      playerNameToSkip: playerName,
+      votesReceived: voterIds.size,
+      votesNeeded: eligibleVoters.length,
+      voterNames: Array.from(voterIds).map(id => room.players.find(p => p.id === id)?.name).filter(Boolean)
+    });
+  }
+}
+
+// Helper function to check if all eligible players have locked in their guesses
+function checkAllPlayersLockedIn(gameState) {
+  if (!gameState || gameState.gamePhase !== 'guessing') return false;
+  
+  const { players, currentPsychicIndex, guessVotes = [], skippedPlayers = [] } = gameState;
+  
+  // Get non-psychic players
+  const nonPsychicPlayers = players.filter((_, index) => index !== currentPsychicIndex);
+  
+  // Further filter out skipped players
+  const eligiblePlayers = nonPsychicPlayers.filter(player => !skippedPlayers.includes(player.name));
+  
+  // Check if all eligible (non-psychic, non-skipped) players have locked in votes
+  const lockedInVotes = guessVotes.filter(vote => vote.isLockedIn);
+  
+  console.log('SERVER: Lock-in check debug:');
+  console.log('- All players:', players.map(p => p.name));
+  console.log('- Psychic index:', currentPsychicIndex);
+  console.log('- Non-psychic players:', nonPsychicPlayers.map(p => p.name));
+  console.log('- Skipped players:', skippedPlayers);
+  console.log('- Eligible players:', eligiblePlayers.map(p => p.name));
+  console.log('- Locked-in votes:', lockedInVotes.length);
+  console.log('- Need votes from:', eligiblePlayers.length);
+  console.log('- All locked in?', lockedInVotes.length >= eligiblePlayers.length && eligiblePlayers.length > 0);
+  
+  return lockedInVotes.length >= eligiblePlayers.length && eligiblePlayers.length > 0;
+}
+
+// Helper function to transition game to scoring phase
+function transitionToScoring(room) {
+  if (!room.gameState || room.gameState.gamePhase !== 'guessing') return false;
+  
+  console.log(`SERVER: Transitioning room ${room.code} to scoring phase`);
+  
+  // Calculate score using the current dial position
+  const dialPosition = room.gameState.dialPosition || 50;
+  const targetPosition = room.gameState.targetPosition || 50;
+  const targetWidth = room.gameState.targetWidth || 25;
+  
+  // Simple scoring logic (matches client-side calculation)
+  const distance = Math.abs(dialPosition - targetPosition);
+  const centerZone = 2.5;
+  const innerZone = 7.5; 
+  const outerZone = 12.5;
+  
+  let points = 0;
+  let zone = 'miss';
+  if (distance <= centerZone) {
+    points = 4;
+    zone = 'center';
+  } else if (distance <= innerZone) {
+    points = 3;
+    zone = 'inner';
+  } else if (distance <= outerZone) {
+    points = 2;
+    zone = 'outer';
+  }
+  
+  // Update game state
+  room.gameState.totalScore = (room.gameState.totalScore || 0) + points;
+  room.gameState.roundScores = [...(room.gameState.roundScores || []), points];
+  room.gameState.roundClues = [...(room.gameState.roundClues || []), room.gameState.psychicClue || ''];
+  room.gameState.gamePhase = 'scoring';
+  
+  console.log(`SERVER: Scored ${points} points in zone "${zone}" for room ${room.code}`);
+  return true;
+}
+
+// Helper function to advance to next available psychic
+function advanceToNextPsychic(room) {
+  if (!room.gameState || !room.gameState.players) return;
+  
+  const connectedPlayers = room.players.filter(p => p.isConnected);
+  const skippedPlayers = room.gameState.skippedPlayers || [];
+  
+  // Find next eligible psychic (connected and not skipped)
+  let nextPsychicIndex = (room.gameState.currentPsychicIndex + 1) % room.gameState.players.length;
+  let attempts = 0;
+  
+  while (attempts < room.gameState.players.length) {
+    const candidate = room.gameState.players[nextPsychicIndex];
+    const isConnected = connectedPlayers.some(p => p.name === candidate.name);
+    const isSkipped = skippedPlayers.includes(candidate.name);
+    
+    if (isConnected && !isSkipped) {
+      // Found eligible psychic
+      room.gameState.currentPsychicIndex = nextPsychicIndex;
+      room.gameState.gamePhase = 'psychic';
+      room.gameState.psychicClue = '';
+      return true;
+    }
+    
+    nextPsychicIndex = (nextPsychicIndex + 1) % room.gameState.players.length;
+    attempts++;
+  }
+  
+  // No eligible psychic found - this shouldn't happen with proper validation
+  console.error(`No eligible psychic found in room ${room.code}`);
+  return false;
+}
+
 // Function to start voting timer
 function startVotingTimer(gameCode) {
   const room = gameRooms.get(gameCode);
@@ -396,10 +600,7 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.isGameStarted) {
-      socket.emit('join-error', { message: 'Game already in progress' });
-      return;
-    }
+    // Allow joining ongoing games (removed restriction)
 
     // Check if player name already exists and is connected
     const existingPlayer = room.players.find(p => p.name.toLowerCase() === playerName.toLowerCase() && p.isConnected);
@@ -435,39 +636,42 @@ io.on('connection', (socket) => {
       
       // If game is in progress, restore player to game cycle
       if (room.gameState && room.isGameStarted) {
-        const connectedPlayers = room.players.filter(p => p.isConnected);
-        
-        // Rebuild the game state players list with reconnected player
-        room.gameState.players = connectedPlayers.map((p, index) => ({
-          id: `player-${index}`,
-          name: p.name,
-          isConnected: true,
-        }));
-        
-        // Find the reconnecting player's position in the new array
-        const reconnectedPlayerIndex = room.gameState.players.findIndex(p => p.name === playerName);
-        
-        // Adjust psychic index if necessary to maintain game flow
-        if (reconnectedPlayerIndex !== -1) {
-          // If the reconnecting player was supposed to be the current psychic, 
-          // and we're not in the middle of their turn, adjust accordingly
-          const currentPsychicName = room.gameState.players[room.gameState.currentPsychicIndex]?.name;
-          if (!currentPsychicName || room.gameState.gamePhase === 'psychic') {
-            // Reset to a valid psychic index
-            room.gameState.currentPsychicIndex = Math.min(room.gameState.currentPsychicIndex, room.gameState.players.length - 1);
-          }
+        // Update player connection status in game state
+        const gamePlayer = room.gameState.players.find(p => p.name === playerName);
+        if (gamePlayer) {
+          gamePlayer.isConnected = true;
         }
         
-        // Broadcast updated game state to all players
-        io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
-        console.log(`Player ${playerName} restored to game cycle in room ${room.code}`);
+        // Remove player from skipped list if they were skipped
+        const wasSkipped = room.gameState.skippedPlayers && room.gameState.skippedPlayers.includes(playerName);
+        if (room.gameState.skippedPlayers) {
+          room.gameState.skippedPlayers = room.gameState.skippedPlayers.filter(name => name !== playerName);
+        }
+        
+        // Clear any skip votes for this player
+        clearSkipVotes(room.code, playerName);
+        
+        // Broadcast updated skip vote status to all players
+        broadcastSkipVoteStatus(room.code);
+        
+        console.log(`Player ${playerName} restored to game cycle in room ${room.code}. Was skipped: ${wasSkipped}. Updated skippedPlayers:`, room.gameState.skippedPlayers);
+        
+        // Explicitly broadcast updated game state to ensure all clients sync the cleared skip status
+        if (wasSkipped) {
+          io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
+          console.log(`SERVER: Broadcasting updated game state after clearing skip status for ${playerName}`);
+        }
       }
       
-      // Notify other players of reconnection
+      // Add connection notification (this will broadcast to all players)
+      addConnectionNotification(room.code, 'reconnected', playerName);
+      
+      // Send a single consolidated update to other players about the reconnection
       socket.to(room.code).emit('player-reconnected', {
-        playerId: socket.id,
-        playerName: playerName,
+        player: disconnectedPlayer,
         room: room,
+        gameState: room.gameState,
+        disconnectedPlayers: room.players.filter(p => !p.isConnected).map(p => p.name)
       });
       
       // If host status changed, notify about host transfer
@@ -509,18 +713,46 @@ io.on('connection', (socket) => {
     }
 
     // Add player to room
-    room.players.push({
+    const newPlayer = {
       id: socket.id,
       name: playerName,
       isHost: false,
       isConnected: true,
-    });
+    };
+    room.players.push(newPlayer);
 
     socket.join(room.code);
     
-    // Notify all players in room
+    // If game is in progress, add player to game cycle
+    if (room.gameState && room.isGameStarted) {
+      // Add player to game state
+      room.gameState.players.push({
+        id: `player-${room.gameState.players.length}`,
+        name: playerName,
+        isConnected: true,
+      });
+      
+      // Broadcast updated game state
+      io.to(room.code).emit('game-state-updated', { 
+        gameState: room.gameState,
+        disconnectedPlayers: room.players.filter(p => !p.isConnected).map(p => p.name)
+      });
+      
+      // Send current game state to new player
+      socket.emit('game-started', {
+        gameConfig: room.gameState,
+        gameState: room.gameState,
+      });
+      
+      console.log(`Player ${playerName} joined ongoing game in room ${room.code}`);
+    }
+    
+    // Add connection notification for new player
+    addConnectionNotification(room.code, 'connected', playerName);
+
+    // Notify all players in room about the new player
     io.to(room.code).emit('player-joined', {
-      player: room.players[room.players.length - 1],
+      player: newPlayer,
       room: room,
     });
 
@@ -618,8 +850,11 @@ io.on('connection', (socket) => {
 
     room.gameState = gameState;
     
-    // Broadcast to all other players in room
-    socket.to(room.code).emit('game-state-updated', { gameState });
+    // Broadcast to all other players in room with disconnected players info
+    socket.to(room.code).emit('game-state-updated', { 
+      gameState,
+      disconnectedPlayers: room.players.filter(p => !p.isConnected).map(p => p.name)
+    });
   });
 
   // Update dial position
@@ -657,6 +892,9 @@ io.on('connection', (socket) => {
     const room = gameRooms.get(gameCode);
 
     if (!room || !room.gameState) return;
+
+    // Clear all skip votes when starting a new round
+    clearAllSkipVotes(gameCode);
 
     // Check if game should end (using the incremented round number)
     const nextRound = room.gameState.currentRound + 1;
@@ -1061,6 +1299,102 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle skip vote for disconnected player
+  socket.on('vote-to-skip-player', (data) => {
+    const { gameCode, playerNameToSkip } = data;
+    const room = gameRooms.get(gameCode);
+    
+    if (!room) {
+      socket.emit('error', { message: 'Game not found' });
+      return;
+    }
+    
+    const voter = room.players.find(p => p.id === socket.id);
+    const playerToSkip = room.players.find(p => p.name === playerNameToSkip);
+    
+    if (!voter || !playerToSkip) {
+      socket.emit('error', { message: 'Player not found' });
+      return;
+    }
+    
+    // Check if player to skip is actually disconnected
+    if (playerToSkip.isConnected) {
+      socket.emit('error', { message: 'Cannot skip connected player' });
+      return;
+    }
+    
+    // Check if we have enough players to skip
+    if (!canSkipPlayer(room, playerNameToSkip)) {
+      socket.emit('error', { message: 'Not enough players to skip' });
+      return;
+    }
+    
+    // Initialize skip tracking for this game if needed
+    if (!skipVotes.has(gameCode)) {
+      skipVotes.set(gameCode, new Map());
+    }
+    
+    const skipMap = skipVotes.get(gameCode);
+    if (!skipMap.has(playerNameToSkip)) {
+      skipMap.set(playerNameToSkip, new Set());
+    }
+    
+    // Add this player's vote to skip
+    const votersForSkip = skipMap.get(playerNameToSkip);
+    votersForSkip.add(socket.id);
+    
+    // Check if all players have voted to skip
+    if (checkSkipVotes(gameCode, playerNameToSkip)) {
+      // All players voted to skip - permanently exclude this player from cycles
+      if (room.gameState) {
+        room.gameState.skippedPlayers = room.gameState.skippedPlayers || [];
+        if (!room.gameState.skippedPlayers.includes(playerNameToSkip)) {
+          room.gameState.skippedPlayers.push(playerNameToSkip);
+        }
+        
+        // If this was the current psychic, move to next player
+        if (room.gameState.gamePhase === 'psychic') {
+          const currentPsychic = room.gameState.players[room.gameState.currentPsychicIndex];
+          if (currentPsychic && currentPsychic.name === playerNameToSkip) {
+            // Move to next psychic
+            advanceToNextPsychic(room);
+          }
+        }
+        
+        // If this was a guesser and we're in guessing phase, check if all remaining players are locked in
+        if (room.gameState.gamePhase === 'guessing') {
+          console.log(`SERVER: Player ${playerNameToSkip} skipped during guessing phase, checking if all others are locked in`);
+          if (checkAllPlayersLockedIn(room.gameState)) {
+            console.log(`SERVER: All remaining players are locked in, transitioning to scoring`);
+            // All remaining players are locked in - transition to scoring
+            transitionToScoring(room);
+          }
+        }
+        
+        // Clear skip votes since action was taken
+        skipMap.delete(playerNameToSkip);
+        
+        // Broadcast updated game state
+        io.to(gameCode).emit('game-state-updated', { 
+          gameState: room.gameState,
+          disconnectedPlayers: room.players.filter(p => !p.isConnected).map(p => p.name),
+          message: `${playerNameToSkip} has been skipped by all players`
+        });
+        
+        console.log(`Player ${playerNameToSkip} skipped by all players in room ${gameCode}`);
+      }
+    } else {
+      // Broadcast current skip vote status
+      const connectedPlayers = room.players.filter(p => p.isConnected);
+      io.to(gameCode).emit('skip-vote-update', {
+        playerNameToSkip,
+        votesReceived: votersForSkip.size,
+        votesNeeded: connectedPlayers.length,
+        voterNames: Array.from(votersForSkip).map(id => room.players.find(p => p.id === id)?.name).filter(Boolean)
+      });
+    }
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
@@ -1071,7 +1405,10 @@ io.on('connection', (socket) => {
       if (player) {
         player.isConnected = false;
         
-        // Notify other players
+        // Add connection notification
+        addConnectionNotification(room.code, 'disconnected', player.name);
+
+        // Notify other players about disconnection
         socket.to(room.code).emit('player-disconnected', {
           playerId: socket.id,
           playerName: player.name,
@@ -1095,31 +1432,20 @@ io.on('connection', (socket) => {
           }
         }
 
-        // If game is in progress, adjust the game cycle to skip disconnected players
+        // If game is in progress, update player connection status but don't automatically skip
         if (room.gameState && room.isGameStarted) {
-          const connectedPlayers = room.players.filter(p => p.isConnected);
-          const disconnectedPlayerIndex = room.gameState.players.findIndex(p => p.name === player.name);
-          
-          if (disconnectedPlayerIndex !== -1 && connectedPlayers.length > 0) {
-            // Update the game state players list to only include connected players
-            room.gameState.players = connectedPlayers.map((p, index) => ({
-              id: `player-${index}`,
-              name: p.name,
-              isConnected: true,
-            }));
-            
-            // Adjust current psychic index if needed
-            if (room.gameState.currentPsychicIndex >= disconnectedPlayerIndex) {
-              // If current psychic disconnected or we need to adjust the index
-              if (room.gameState.currentPsychicIndex >= room.gameState.players.length) {
-                room.gameState.currentPsychicIndex = 0; // Reset to first player
-              }
-            }
-            
-            // Broadcast updated game state to remaining players
-            io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
-            console.log(`Game cycle adjusted for disconnected player ${player.name} in room ${room.code}`);
+          // Update player connection status in game state
+          const gamePlayer = room.gameState.players.find(p => p.name === player.name);
+          if (gamePlayer) {
+            gamePlayer.isConnected = false;
           }
+          
+          // Broadcast updated game state to show disconnection status
+          io.to(room.code).emit('game-state-updated', { 
+            gameState: room.gameState,
+            disconnectedPlayers: room.players.filter(p => !p.isConnected).map(p => p.name)
+          });
+          console.log(`Player ${player.name} marked as disconnected in room ${room.code}`);
         }
 
         break;
