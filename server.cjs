@@ -1003,6 +1003,7 @@ io.on('connection', (socket) => {
       const newCard = getConceptForGame(room.gameState, nextPromptIndex);
       const newTargetPosition = Math.random() * 100;
       
+      
       // Update room game state
       room.gameState.currentCard = newCard;
       room.gameState.targetPosition = newTargetPosition;
@@ -1014,7 +1015,8 @@ io.on('connection', (socket) => {
       io.to(room.code).emit('new-round-data', {
         currentCard: newCard,
         targetPosition: newTargetPosition,
-        currentRound: room.gameState.currentRound
+        currentRound: room.gameState.currentRound,
+        currentPsychicIndex: room.gameState.currentPsychicIndex
       });
 
       console.log(`New round started for game ${room.code}: ${newCard.leftConcept} - ${newCard.rightConcept}`);

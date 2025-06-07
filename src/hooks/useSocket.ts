@@ -418,6 +418,7 @@ export const useSocket = () => {
           currentCard: data.currentCard,
           targetPosition: data.targetPosition,
           currentRound: data.currentRound,
+          currentPsychicIndex: data.currentPsychicIndex,
           gamePhase: 'psychic',
         },
       }));
