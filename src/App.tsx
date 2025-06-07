@@ -200,12 +200,15 @@ function App() {
           }
         } else {
           // Normal operation: Host only syncs connection-related fields to avoid overriding their own game state
+          // IMPORTANT: Include currentPsychicIndex to ensure psychic rotation works properly
           const connectionFields = {
             players: multiplayerState.syncedGameState.players,
-            skippedPlayers: multiplayerState.syncedGameState.skippedPlayers
+            skippedPlayers: multiplayerState.syncedGameState.skippedPlayers,
+            currentPsychicIndex: multiplayerState.syncedGameState.currentPsychicIndex
           };
           console.log(`[${currentPlayerName}] CLIENT: Host syncing connection fields:`, connectionFields);
           console.log(`[${currentPlayerName}] CLIENT: Host local state BEFORE sync - skippedPlayers:`, gameState.skippedPlayers);
+          console.log(`[${currentPlayerName}] CLIENT: Host local state BEFORE sync - currentPsychicIndex:`, gameState.currentPsychicIndex);
           syncGameState(connectionFields);
           console.log(`[${currentPlayerName}] CLIENT: Host should now have updated local state`);
         }
@@ -248,9 +251,12 @@ function App() {
         return isConnected && !isDisconnected;
       });
       
-      // AGGRESSIVE prevention: Don't sync if host recently reconnected OR if they're in their own skipped list OR if any connected player is marked as skipped
-      if (hostRecentlyReconnected || hostIsInSkippedList || hasStaleSkippedData) {
-        console.log(`[${currentPlayerName}] Host sync blocked:`);
+      // Prevent sync only if host recently reconnected AND has stale data (not just any recent reconnection)
+      // Allow psychic rotation updates to go through even during reconnection recovery
+      const shouldBlockSync = hostRecentlyReconnected && (hostIsInSkippedList || hasStaleSkippedData);
+      
+      if (shouldBlockSync) {
+        console.log(`[${currentPlayerName}] Host sync blocked due to stale reconnection state:`);
         console.log(`  - Recently reconnected: ${hostRecentlyReconnected}`);
         console.log(`  - Self in skipped list: ${hostIsInSkippedList}`);
         console.log(`  - Has stale skipped data: ${hasStaleSkippedData}`);
@@ -264,6 +270,10 @@ function App() {
       const stateToSync = gameState.gamePhase === 'prompt-voting' 
         ? { ...gameState, promptVotes: undefined }
         : gameState;
+      
+      const currentPsychic = gameState.players[gameState.currentPsychicIndex];
+      console.log(`[${currentPlayerName}] Host syncing psychic: ${currentPsychic?.name} (index ${gameState.currentPsychicIndex})`);
+      
       updateGameState(stateToSync);
     }
   }, [playMode, multiplayerState.isHost, gameState.currentPsychicIndex, gameState.currentRound, gameState.gamePhase, gameState.psychicClue, gameState.skippedPlayers, multiplayerState.players, multiplayerState.currentPlayerId, hostRecentlyReconnected, updateGameState]);

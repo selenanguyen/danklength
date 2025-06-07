@@ -482,25 +482,40 @@ function advanceToNextPsychic(room) {
   const connectedPlayers = room.players.filter(p => p.isConnected);
   const skippedPlayers = room.gameState.skippedPlayers || [];
   
+  console.log(`SERVER: advanceToNextPsychic - Starting from current psychic index: ${room.gameState.currentPsychicIndex}`);
+  console.log(`SERVER: advanceToNextPsychic - Connected players:`, connectedPlayers.map(p => p.name));
+  console.log(`SERVER: advanceToNextPsychic - Skipped players:`, skippedPlayers);
+  console.log(`SERVER: advanceToNextPsychic - All game players:`, room.gameState.players.map(p => p.name));
+  
   // Find next eligible psychic (connected and not skipped)
   let nextPsychicIndex = (room.gameState.currentPsychicIndex + 1) % room.gameState.players.length;
   let attempts = 0;
+  
+  console.log(`SERVER: advanceToNextPsychic - Starting search at index: ${nextPsychicIndex}`);
   
   while (attempts < room.gameState.players.length) {
     const candidate = room.gameState.players[nextPsychicIndex];
     const isConnected = connectedPlayers.some(p => p.name === candidate.name);
     const isSkipped = skippedPlayers.includes(candidate.name);
     
+    console.log(`SERVER: advanceToNextPsychic - Checking candidate: ${candidate.name} (index ${nextPsychicIndex})`);
+    console.log(`  - Is connected: ${isConnected}`);
+    console.log(`  - Is skipped: ${isSkipped}`);
+    console.log(`  - Is eligible: ${isConnected && !isSkipped}`);
+    
     if (isConnected && !isSkipped) {
       // Found eligible psychic
+      console.log(`SERVER: advanceToNextPsychic - Found eligible psychic: ${candidate.name} at index ${nextPsychicIndex}`);
       room.gameState.currentPsychicIndex = nextPsychicIndex;
       room.gameState.gamePhase = 'psychic';
       room.gameState.psychicClue = '';
       return true;
     }
     
-    nextPsychicIndex = (nextPsychicIndex + 1) % room.gameState.players.length;
+    // IMPORTANT: Increment attempts BEFORE moving to next index
     attempts++;
+    nextPsychicIndex = (nextPsychicIndex + 1) % room.gameState.players.length;
+    console.log(`SERVER: advanceToNextPsychic - Moving to next index: ${nextPsychicIndex} (attempt ${attempts})`);
   }
   
   // No eligible psychic found - this shouldn't happen with proper validation
@@ -880,6 +895,8 @@ io.on('connection', (socket) => {
     console.log(`🔥 SERVER: Received game state update from ${playerName}`);
     console.log(`🔥 SERVER: Current skippedPlayers:`, room.gameState?.skippedPlayers);
     console.log(`🔥 SERVER: Incoming skippedPlayers:`, gameState?.skippedPlayers);
+    console.log(`🔥 SERVER: Current psychic: ${room.gameState?.players[room.gameState?.currentPsychicIndex]?.name} (index ${room.gameState?.currentPsychicIndex})`);
+    console.log(`🔥 SERVER: Incoming psychic: ${gameState?.players[gameState?.currentPsychicIndex]?.name} (index ${gameState?.currentPsychicIndex})`);
 
     // During prompt-voting phase, preserve existing promptVotes if incoming state doesn't have them
     if (room.gameState && room.gameState.gamePhase === 'prompt-voting' && 
@@ -957,11 +974,10 @@ io.on('connection', (socket) => {
     room.gameState.psychicClue = ''; // Reset clue
     room.gameState.promptVotes = []; // Reset votes
     
-    // Rotate psychic to next player
-    const connectedPlayers = room.players.filter(p => p.isConnected);
-    if (connectedPlayers.length > 0) {
-      room.gameState.currentPsychicIndex = (room.gameState.currentPsychicIndex + 1) % connectedPlayers.length;
-    }
+    // Rotate to next eligible psychic (connected and not skipped)
+    console.log(`SERVER: Current psychic before rotation: ${room.gameState.players[room.gameState.currentPsychicIndex]?.name} (index ${room.gameState.currentPsychicIndex})`);
+    advanceToNextPsychic(room);
+    console.log(`SERVER: New psychic after rotation: ${room.gameState.players[room.gameState.currentPsychicIndex]?.name} (index ${room.gameState.currentPsychicIndex})`);
     
     // For custom mode, start voting phase
     if (room.gameState.mode === 'custom' && room.customPrompts && room.customPrompts.length > 0) {
