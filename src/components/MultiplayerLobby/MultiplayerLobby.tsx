@@ -43,8 +43,6 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   };
   const [leftSide, setLeftSide] = useState('');
   const [rightSide, setRightSide] = useState('');
-  const [autoStartTimer, setAutoStartTimer] = useState<number | null>(null);
-  const [countdownInterval, setCountdownInterval] = useState<NodeJS.Timeout | null>(null);
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
 
@@ -80,46 +78,6 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
     }
   }, [initialConfig?.customPrompts, initialPromptsLoaded, multiplayerState.isHost, submitCustomPrompt]);
   
-  // Auto-start logic when reaching 8 prompts
-  const ROUNDS_FOR_AUTO_START = 8;
-  const AUTO_START_COUNTDOWN = 30;
-
-  // Start countdown when we reach enough prompts
-  useEffect(() => {
-    if (multiplayerState.isHost && gameMode === 'custom' && submittedPrompts.length >= ROUNDS_FOR_AUTO_START) {
-      if (autoStartTimer === null) {
-        // Start the countdown
-        setAutoStartTimer(AUTO_START_COUNTDOWN);
-        
-        const interval = setInterval(() => {
-          setAutoStartTimer(prev => {
-            if (prev === null) return null;
-            if (prev <= 1) {
-              // Auto-start the game
-              handleStartGame();
-              return null;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-        
-        setCountdownInterval(interval);
-      }
-    } else if (submittedPrompts.length < ROUNDS_FOR_AUTO_START && autoStartTimer !== null) {
-      // Clear timer if prompts go below threshold (shouldn't happen normally)
-      setAutoStartTimer(null);
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        setCountdownInterval(null);
-      }
-    }
-    
-    return () => {
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-      }
-    };
-  }, [submittedPrompts.length, gameMode, multiplayerState.isHost]);
 
   const handleCreateGame = () => {
     if (playerName.trim()) {
@@ -401,12 +359,6 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                   </div>
                 </div>
 
-                {/* Auto-start countdown display */}
-                {autoStartTimer !== null && (
-                  <div className="auto-start-countdown">
-                    🚀 Game starting automatically in {autoStartTimer} seconds...
-                  </div>
-                )}
               </div>
             )}
 

@@ -5,6 +5,9 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 
+// Game constants
+const PROMPT_VOTING_TIME_SECONDS = 25;
+
 // Spectrum concepts data
 const spectrumConcepts = [
   { id: '1', leftConcept: 'Hot', rightConcept: 'Cold' },
@@ -306,7 +309,7 @@ function startVotingTimer(gameCode) {
   const room = gameRooms.get(gameCode);
   if (!room || !room.gameState) return;
   
-  let timeLeft = 10;
+  let timeLeft = PROMPT_VOTING_TIME_SECONDS;
   room.gameState.votingTimeLeft = timeLeft;
   
   const timer = setInterval(() => {
@@ -581,7 +584,7 @@ io.on('connection', (socket) => {
       roundScores: [],
       currentPromptIndex: 0, // Track current prompt index for custom games
       promptVotes: [],
-      votingTimeLeft: 10,
+      votingTimeLeft: PROMPT_VOTING_TIME_SECONDS,
       customPrompts: room.customPrompts ? getCustomPromptsAsConcepts(room.customPrompts) : undefined
     };
 
@@ -659,7 +662,7 @@ io.on('connection', (socket) => {
     const nextRound = room.gameState.currentRound + 1;
     const totalRounds = room.gameState.totalRounds || 8;
     
-    if (nextRound > 2) { // TODO (Selena, not claude): change this back to totalRounds
+    if (nextRound > totalRounds) { // TODO (Selena, not claude): change this back to totalRounds
       // Game should end
       room.gameState.gamePhase = 'ended';
       io.to(room.code).emit('game-state-updated', { gameState: room.gameState });
@@ -682,7 +685,7 @@ io.on('connection', (socket) => {
     // For custom mode, start voting phase
     if (room.gameState.mode === 'custom' && room.customPrompts && room.customPrompts.length > 0) {
       room.gameState.gamePhase = 'prompt-voting';
-      room.gameState.votingTimeLeft = 10;
+      room.gameState.votingTimeLeft = PROMPT_VOTING_TIME_SECONDS;
       
       // Ensure custom prompts are preserved in the game state
       room.gameState.customPrompts = getCustomPromptsAsConcepts(room.customPrompts);

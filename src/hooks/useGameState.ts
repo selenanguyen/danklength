@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { GameState, GameConfig, Player, SpectrumConcept, ScoreResult, GuessVote, PromptVote } from '../types';
 import { getRandomConcept } from '../data/spectrumConcepts';
+import { PROMPT_VOTING_TIME_SECONDS } from '../constants';
 
 const initialGameState: GameState = {
   gameMode: 'normal',
@@ -103,7 +104,7 @@ export const useGameState = () => {
           currentRound: nextRound,
           currentPsychicIndex: players.length > 0 ? (prev.currentPsychicIndex + 1) % players.length : 0,
           promptVotes: [],
-          votingTimeLeft: 20,
+          votingTimeLeft: PROMPT_VOTING_TIME_SECONDS,
         };
       } else {
         // For normal mode, determine phase based on play mode

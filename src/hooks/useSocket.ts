@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { GameState, GameConfig, Player, PromptVote } from '../types';
 import { config } from '../config';
+import { PROMPT_VOTING_TIME_SECONDS } from '../constants';
 
 // Socket event interfaces for documentation
 // interface SocketEvents {
@@ -322,7 +323,7 @@ export const useSocket = () => {
         ...prev,
         syncedGameState: data.gameState,
         promptVotes: [],
-        votingTimeLeft: 10,
+        votingTimeLeft: PROMPT_VOTING_TIME_SECONDS,
       }));
     });
 
