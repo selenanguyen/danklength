@@ -45,6 +45,11 @@ function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [hostRecentlyReconnected, setHostRecentlyReconnected] = useState(false);
 
+  // Background music state
+  const [isMusicEnabled, setIsMusicEnabled] = useState(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [musicIntervalId, setMusicIntervalId] = useState<NodeJS.Timeout | null>(null);
+
   // Emoji reaction system
   const [fallingEmojis, setFallingEmojis] = useState<Array<{
     id: string;
@@ -54,6 +59,121 @@ function App() {
   }>>([]);
 
   const EMOJIS = ['😍', '😭', '😠', '🪩', '😘', '💩'];
+
+  // Background music initialization
+  useEffect(() => {
+    // Initialize Web Audio API context
+    const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+    setAudioContext(context);
+    
+    return () => {
+      // Clean up music and audio context
+      if (musicIntervalId) {
+        clearInterval(musicIntervalId);
+      }
+      if (context && context.state !== 'closed') {
+        context.close();
+      }
+    };
+  }, [musicIntervalId]);
+
+  // Create cute Nintendo-style chiptune music
+  const playNote = useCallback((frequency: number, duration: number, startTime: number = 0) => {
+    if (!audioContext) return;
+    
+    // Resume audio context if it's suspended (required by browsers)
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    
+    // Create oscillator for the note
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    // Set up classic video game square wave sound
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime + startTime);
+    
+    // Cute volume with slight fade in/out for smoothness
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime + startTime);
+    gainNode.gain.linearRampToValueAtTime(0.05, audioContext.currentTime + startTime + 0.01);
+    gainNode.gain.linearRampToValueAtTime(0.05, audioContext.currentTime + startTime + duration - 0.01);
+    gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + startTime + duration);
+    
+    // Connect the nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Start and stop the note
+    oscillator.start(audioContext.currentTime + startTime);
+    oscillator.stop(audioContext.currentTime + startTime + duration);
+  }, [audioContext]);
+
+  const startCuteMusic = useCallback(() => {
+    if (!audioContext) return;
+    
+    // Define a cute, bouncy melody (frequencies in Hz)
+    // Notes: C5, E5, G5, C6, G5, E5, C5, G4 (happy C major progression)
+    const melody = [
+      523.25, // C5
+      659.25, // E5  
+      783.99, // G5
+      1046.50, // C6 (octave up)
+      783.99, // G5
+      659.25, // E5
+      523.25, // C5
+      392.00, // G4 (lower for variety)
+      523.25, // C5
+      659.25, // E5
+      783.99, // G5
+      523.25, // C5
+      659.25, // E5
+      783.99, // G5
+      1046.50, // C6
+      783.99  // G5
+    ];
+    
+    const noteDuration = 0.3; // Each note lasts 300ms
+    const totalDuration = melody.length * noteDuration;
+    
+    // Play the melody
+    melody.forEach((frequency, index) => {
+      playNote(frequency, noteDuration * 0.8, index * noteDuration); // 0.8 for slight gaps between notes
+    });
+    
+    // Set up looping
+    const intervalId = setInterval(() => {
+      melody.forEach((frequency, index) => {
+        playNote(frequency, noteDuration * 0.8, index * noteDuration);
+      });
+    }, totalDuration * 1000);
+    
+    setMusicIntervalId(intervalId);
+  }, [audioContext, playNote]);
+
+  const stopCuteMusic = useCallback(() => {
+    if (musicIntervalId) {
+      clearInterval(musicIntervalId);
+      setMusicIntervalId(null);
+    }
+  }, [musicIntervalId]);
+
+  // Music control functions
+  const toggleMusic = useCallback(() => {
+    if (!audioContext) return;
+    
+    if (isMusicEnabled) {
+      // Stop cute music
+      stopCuteMusic();
+      setIsMusicEnabled(false);
+      console.log('Cute music stopped');
+    } else {
+      // Start cute music
+      startCuteMusic();
+      setIsMusicEnabled(true);
+      console.log('Cute Nintendo-style music started! 🎵');
+    }
+  }, [audioContext, isMusicEnabled, startCuteMusic, stopCuteMusic]);
 
   // Emoji reaction functions
   const createFallingEmoji = useCallback((emoji: string) => {
@@ -581,54 +701,95 @@ function App() {
   if (gameState.gamePhase === 'setup' && playMode === null) {
     const cachedSession = getCachedGameSession();
     return (
-      <div className="game-container compact">
-        <GameSetup 
-          onStartGame={handleGameSetup} 
-          onStartMultiplayer={handleMultiplayerSetup}
-          onReconnect={cachedSession ? handleReconnect : undefined}
-          cachedGameCode={cachedSession?.gameCode}
-        />
-      </div>
+      <>
+        {/* Music Toggle Button - Always visible */}
+        <div className="music-control">
+          <button
+            className="music-toggle-button"
+            onClick={toggleMusic}
+            type="button"
+            title={isMusicEnabled ? 'Turn off music' : 'Turn on music'}
+          >
+            {isMusicEnabled ? '🔊' : '🔇'}
+          </button>
+        </div>
+        
+        <div className="game-container compact">
+          <GameSetup 
+            onStartGame={handleGameSetup} 
+            onStartMultiplayer={handleMultiplayerSetup}
+            onReconnect={cachedSession ? handleReconnect : undefined}
+            cachedGameCode={cachedSession?.gameCode}
+          />
+        </div>
+      </>
     );
   }
 
   // Multiplayer lobby
   if (playMode === 'remote' && gameState.gamePhase === 'setup') {
     return (
-      <div className="game-container compact">
-        {/* Connection Notifications - positioned relative to container */}
-        {multiplayerState.connectionNotifications.length > 0 && (
-          <div className="connection-notifications">
-            {multiplayerState.connectionNotifications.map((notification) => (
-              <div 
-                key={notification.id}
-                className={`notification notification-${notification.type}`}
-              >
-                <span className="notification-text">
-                  {notification.playerName} {notification.type === 'connected' ? 'connected' : 
-                    notification.type === 'disconnected' ? 'disconnected' : 're-connected'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+      <>
+        {/* Music Toggle Button - Always visible */}
+        <div className="music-control">
+          <button
+            className="music-toggle-button"
+            onClick={toggleMusic}
+            type="button"
+            title={isMusicEnabled ? 'Turn off music' : 'Turn on music'}
+          >
+            {isMusicEnabled ? '🔊' : '🔇'}
+          </button>
+        </div>
+        
+        <div className="game-container compact">
+          {/* Connection Notifications - positioned relative to container */}
+          {multiplayerState.connectionNotifications.length > 0 && (
+            <div className="connection-notifications">
+              {multiplayerState.connectionNotifications.map((notification) => (
+                <div 
+                  key={notification.id}
+                  className={`notification notification-${notification.type}`}
+                >
+                  <span className="notification-text">
+                    {notification.playerName} {notification.type === 'connected' ? 'connected' : 
+                      notification.type === 'disconnected' ? 'disconnected' : 're-connected'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
-
-        <MultiplayerLobby 
-          onBackToLocal={handleBackToWelcome}
-          socketInstance={socketInstance}
-          initialConfig={lastGameConfig}
-        />
-      </div>
+          <MultiplayerLobby 
+            onBackToLocal={handleBackToWelcome}
+            socketInstance={socketInstance}
+            initialConfig={lastGameConfig}
+          />
+        </div>
+      </>
     );
   }
 
   // Player setup screen (local only)
   if (gameState.gamePhase === 'player-setup' && playMode === 'local') {
     return (
-      <div className="game-container compact">
-        <PlayerSetup onStartGame={handlePlayerSetup} onBackToMain={handleBackToWelcome} initialConfig={lastGameConfig} />
-      </div>
+      <>
+        {/* Music Toggle Button - Always visible */}
+        <div className="music-control">
+          <button
+            className="music-toggle-button"
+            onClick={toggleMusic}
+            type="button"
+            title={isMusicEnabled ? 'Turn off music' : 'Turn on music'}
+          >
+            {isMusicEnabled ? '🔊' : '🔇'}
+          </button>
+        </div>
+        
+        <div className="game-container compact">
+          <PlayerSetup onStartGame={handlePlayerSetup} onBackToMain={handleBackToWelcome} initialConfig={lastGameConfig} />
+        </div>
+      </>
     );
   }
 
@@ -785,6 +946,9 @@ function App() {
 
   // Show emoji reactions during active gameplay (not during setup screens)
   const showEmojiReactions = gameState.gamePhase !== 'setup' && gameState.gamePhase !== 'player-setup' && playMode !== null;
+  
+  // Show music control everywhere
+  const showMusicControl = true;
 
   return (
     <>
@@ -1119,6 +1283,20 @@ function App() {
         )}
       </div>
     </div>
+
+    {/* Music Toggle Button - Always visible */}
+    {showMusicControl && (
+      <div className="music-control">
+        <button
+          className="music-toggle-button"
+          onClick={toggleMusic}
+          type="button"
+          title={isMusicEnabled ? 'Turn off music' : 'Turn on music'}
+        >
+          {isMusicEnabled ? '🔊' : '🔇'}
+        </button>
+      </div>
+    )}
 
     {/* Emoji Reaction System - Available during active gameplay */}
     {showEmojiReactions && (

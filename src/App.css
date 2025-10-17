@@ -492,6 +492,43 @@
   font-size: 14px;
 }
 
+/* Music Control */
+.music-control {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10000;
+}
+
+.music-toggle-button {
+  font-size: 24px;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  transition: transform 0.2s ease;
+  background: none !important;
+  border: none;
+  padding: 8px;
+  margin: 0;
+  line-height: 1;
+  box-shadow: none !important;
+  text-transform: none;
+  letter-spacing: normal;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(5px);
+}
+
+.music-toggle-button:hover {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.music-toggle-button:active {
+  transform: scale(0.95);
+}
+
 /* Emoji Reaction System */
 .emoji-reactions {
   position: fixed;

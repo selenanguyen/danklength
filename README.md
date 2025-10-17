@@ -136,17 +136,37 @@ Then open: http://localhost:5173/
 
 Want to host the game online so friends can play without downloading anything?
 
-### Quick Deploy
-1. **Server**: Deploy to [Railway](https://railway.app) (free trial)
-2. **Frontend**: Deploy to [Netlify](https://netlify.com) (free)
-3. **Share URL**: Friends just visit your website!
+### ⚡ Quick Deploy (Recommended)
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
+**Render + Vercel** - Deploy in ~10 minutes:
+
+1. **Backend to Render** (free tier)
+   - Create Web Service from GitHub
+   - Auto-deploys on push to master
+
+2. **Frontend to Vercel** (free tier)
+   - Import GitHub repository
+   - Set `VITE_SERVER_URL` environment variable
+   - Auto-deploys on every commit
+
+**See:** [QUICK_DEPLOY.md](./QUICK_DEPLOY.md) for step-by-step checklist
+
+### 📚 Documentation
+
+- **Quick Start**: [QUICK_DEPLOY.md](./QUICK_DEPLOY.md) - 10-minute setup guide
+- **Detailed Guide**: [RENDER_VERCEL_SETUP.md](./RENDER_VERCEL_SETUP.md) - Step-by-step with screenshots
+- **Full Reference**: [DEPLOYMENT.md](./DEPLOYMENT.md) - Comprehensive troubleshooting
 
 ### Hosting Options
-- **Railway + Netlify**: Recommended (easy setup)
-- **Vercel**: Full-stack option
-- **Heroku**: Traditional platform
+
+| Platform | Backend | Frontend | Cost | Setup Time |
+|----------|---------|----------|------|------------|
+| **Render + Vercel** | ✅ | ✅ | Free* | ~10 min |
+| Railway + Netlify | ✅ | ✅ | $5/mo | ~15 min |
+| Vercel (Full-stack) | ✅ | ✅ | Free | ~10 min |
+| Render (Both) | ✅ | ✅ | Free* | ~10 min |
+
+\* Free tier has limitations (backend spins down after 15min inactivity)
 
 ## 🏗️ Tech Stack
 

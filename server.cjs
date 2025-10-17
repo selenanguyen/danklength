@@ -119,8 +119,30 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: function (origin, callback) {
-      // Allow all origins for debugging, including undefined (for same-origin requests)
-      callback(null, true);
+      // Allow all origins in production (Vercel, local dev, etc.)
+      // In production, you might want to restrict this to specific domains
+      const allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        /\.vercel\.app$/,
+        /\.netlify\.app$/,
+      ];
+
+      // Allow if no origin (same-origin) or if origin matches allowed list
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      // Check if origin matches any allowed pattern
+      const isAllowed = allowedOrigins.some(pattern => {
+        if (pattern instanceof RegExp) {
+          return pattern.test(origin);
+        }
+        return pattern === origin;
+      });
+
+      callback(null, isAllowed || process.env.NODE_ENV === 'development');
     },
     methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
